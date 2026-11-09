@@ -261,7 +261,6 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
   .bar > div, .w { transition: none; }
 }
 </style>
-<script src="https://js.puter.com/v2/"></script>
 </head>
 <body>
 
@@ -1087,8 +1086,25 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
     card.appendChild(d);
     $('cloudOut').appendChild(card);
   }
+  var puterLoading = null;
+  function ensurePuter() {
+    if (window.puter) return Promise.resolve();
+    if (!puterLoading) {
+      puterLoading = new Promise(function (resolve, reject) {
+        var s = document.createElement('script');
+        s.src = 'https://js.puter.com/v2/';
+        s.onload = function () { resolve(); };
+        s.onerror = function () { puterLoading = null; reject(new Error('Puter did not load')); };
+        document.head.appendChild(s);
+      });
+    }
+    return puterLoading;
+  }
   async function cloudGenerate() {
-    if (!STANDALONE || !window.puter || !window.puter.ai || !window.puter.ai.txt2speech) {
+    if (!STANDALONE) { setStatus('Puter voices need the standalone file.'); return; }
+    setStatus('Loading Puter…');
+    try { await ensurePuter(); } catch (e) { /* handled below */ }
+    if (!window.puter || !window.puter.ai || !window.puter.ai.txt2speech) {
       setStatus('Puter did not load. Check your connection and refresh the page.');
       return;
     }
@@ -1327,7 +1343,10 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
     $('rvCount').textContent = list.length + ' voices';
   }
   async function rvConvert() {
-    if (!STANDALONE || !window.puter || !window.puter.ai || !window.puter.ai.speech2speech) {
+    if (!STANDALONE) { rvStatus('Re-voice needs the standalone file.'); return; }
+    rvStatus('Loading Puter…');
+    try { await ensurePuter(); } catch (e) { /* handled below */ }
+    if (!window.puter || !window.puter.ai || !window.puter.ai.speech2speech) {
       rvStatus('Puter did not load. Check your connection and refresh the page.');
       return;
     }
