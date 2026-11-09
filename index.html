@@ -1548,6 +1548,14 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
     };
   }
 
+  async function probeFish(key) {
+    try {
+      await fetch('https://api.fish.audio/model?page_size=1&self=true', { headers: { 'Authorization': 'Bearer ' + key } });
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
   async function keysGenerate() {
     if (!STANDALONE) { setStatus('Pro voices need the standalone file.'); return; }
     var svc = ksvc(), key = (KEYS[svc] || '').trim(), text = $('script').value.trim();
@@ -1568,7 +1576,29 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
         setStatus('Generating section ' + (i + 1) + ' of ' + chunks.length + ' with ' + svcName(svc) + '…');
         var r = kRequest(svc, key, voice, chunks[i]);
         r.opts.signal = kAbort.signal;
-        var resp = await apiFetch(r.url, r.opts, svcName(svc));
+        var resp;
+        try {
+          resp = await apiFetch(r.url, r.opts, svcName(svc));
+        } catch (err1) {
+          if (svc === 'fish' && err1 && /^Could not reach/.test(err1.message) && r.opts.headers.model) {
+            var reachable = await probeFish(key);
+            if (!reachable) {
+              throw new Error('Fish Audio did not answer from this web page. Either the key or connection is wrong, or Fish Audio does not allow web pages to call it.');
+            }
+            setStatus('Fish Audio blocked the model setting. Retrying with its default model…');
+            delete r.opts.headers.model;
+            try {
+              resp = await apiFetch(r.url, r.opts, svcName(svc));
+            } catch (err2) {
+              if (err2 && /^Could not reach/.test(err2.message)) {
+                throw new Error('Fish Audio accepts a basic request from this page but blocks the audio request. It does not allow web pages to generate audio directly. Use ElevenLabs, or ask Claude to set up a small relay.');
+              }
+              throw err2;
+            }
+          } else {
+            throw err1;
+          }
+        }
         var blob = await resp.blob();
         if (!blob.size) throw new Error('The service returned empty audio.');
         var u = URL.createObjectURL(blob);
