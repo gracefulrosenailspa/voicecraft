@@ -368,6 +368,7 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
           </div>
           <div class="field"><label for="kVoice">Voice <output id="kCount"></output></label><select id="kVoice"></select></div>
           <div class="field"><label for="kVoiceManual">Or paste a voice ID</label><input type="text" id="kVoiceManual" autocomplete="off" spellcheck="false"></div>
+          <div class="field" id="kRelayField"><label for="kRelay">Relay address, Fish Audio only</label><input type="text" id="kRelay" autocomplete="off" spellcheck="false" placeholder="https://voicecraft-relay.your-name.workers.dev"></div>
           <p class="note" id="kNote"></p>
           <p class="note">Your key stays in this browser and goes only to the service you pick. Anyone using this device with keys remembered could spend your credit.</p>
         </section>
@@ -1459,6 +1460,8 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
     mSel.value = S['kmod_' + svc] || models[0][0];
     $('kScope').value = S.kScope === 'library' ? 'library' : 'mine';
     $('kVoiceManual').value = S['km_' + svc] || '';
+    $('kRelay').value = S.kRelay || '';
+    $('kRelayField').hidden = svc !== 'fish';
     $('kSearch').placeholder = 'Search, e.g. deep male narrator';
     renderKVoices();
     $('cloneKey').value = KEYS[cSel.value || 'fish'] || '';
@@ -1503,7 +1506,7 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
         });
         list.sort(function (a, b) { return (a.male === b.male) ? 0 : (a.male ? -1 : 1); });
       } else {
-        url = 'https://api.fish.audio/model?page_size=' + (lib ? 30 : 50) + (lib ? '&sort_by=score' : '&self=true&sort_by=created_at') + (q ? '&title=' + enc(q) : '');
+        url = fishBase() + '/model?page_size=' + (lib ? 30 : 50) + (lib ? '&sort_by=score' : '&self=true&sort_by=created_at') + (q ? '&title=' + enc(q) : '');
         var jf = await (await apiFetch(url, { headers: { 'Authorization': 'Bearer ' + key } }, 'Fish Audio')).json();
         list = (jf.items || []).filter(function (m) { return m.type !== 'svc'; }).map(function (m) {
           return { id: m._id, name: m.title, note: (m.languages || []).slice(0, 2).join(', ') };
@@ -1533,7 +1536,7 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
       var model = S.kmod_fish || 's2.1-pro-free';
       var body = { text: fishText(text, model), format: 'mp3', temperature: clamp(0.5 + 0.35 * i, 0.3, 0.9), prosody: { speed: clamp(S.rate, 0.5, 2) } };
       if (voice) body.reference_id = voice;
-      return { url: 'https://api.fish.audio/v1/tts', opts: { method: 'POST', headers: { 'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json', 'model': model }, body: JSON.stringify(body) } };
+      return { url: fishBase() + '/v1/tts', opts: { method: 'POST', headers: { 'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json', 'model': model }, body: JSON.stringify(body) } };
     }
     var em = S.kmod_eleven || 'eleven_multilingual_v2';
     var stab = clamp(0.8 - 0.6 * i, 0.2, 0.8);
@@ -1548,9 +1551,13 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
     };
   }
 
+  function fishBase() {
+    var r = (S.kRelay || '').trim().replace(/\/+$/, '');
+    return /^https:\/\//.test(r) ? r : 'https://api.fish.audio';
+  }
   async function probeFish(key) {
     try {
-      await fetch('https://api.fish.audio/model?page_size=1&self=true', { headers: { 'Authorization': 'Bearer ' + key } });
+      await fetch(fishBase() + '/model?page_size=1&self=true', { headers: { 'Authorization': 'Bearer ' + key } });
       return true;
     } catch (e) {
       return false;
@@ -1591,7 +1598,7 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
               resp = await apiFetch(r.url, r.opts, svcName(svc));
             } catch (err2) {
               if (err2 && /^Could not reach/.test(err2.message)) {
-                throw new Error('Fish Audio accepts a basic request from this page but blocks the audio request. It does not allow web pages to generate audio directly. Use ElevenLabs, or ask Claude to set up a small relay.');
+                throw new Error('Fish Audio accepts a basic request from this page but blocks the audio request. It does not allow web pages to generate audio directly. Fill in the Relay address field with your own relay, or use ElevenLabs.');
               }
               throw err2;
             }
@@ -1632,7 +1639,7 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
         fd.append('type', 'tts'); fd.append('title', name); fd.append('train_mode', 'fast');
         fd.append('visibility', 'private'); fd.append('enhance_audio_quality', 'true');
         fd.append('voices', labFile, labFile.name);
-        var r = await apiFetch('https://api.fish.audio/model', { method: 'POST', headers: { 'Authorization': 'Bearer ' + key }, body: fd }, 'Fish Audio');
+        var r = await apiFetch(fishBase() + '/model', { method: 'POST', headers: { 'Authorization': 'Bearer ' + key }, body: fd }, 'Fish Audio');
         var j = await r.json();
         id = j._id || j.id;
       } else {
@@ -1665,6 +1672,7 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
   $('kScope').addEventListener('change', function () { S.kScope = $('kScope').value; renderKVoices(); persist(); });
   $('kVoice').addEventListener('change', function () { S['kv_' + ksvc()] = $('kVoice').value; persist(); });
   $('kVoiceManual').addEventListener('input', function () { S['km_' + ksvc()] = $('kVoiceManual').value; persist(); });
+  $('kRelay').addEventListener('input', function () { S.kRelay = $('kRelay').value.trim(); persist(); });
   $('kLoad').addEventListener('click', kLoadVoices);
   $('kSearch').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); kLoadVoices(); } });
   $('cloneService').addEventListener('change', function () { $('cloneKey').value = KEYS[$('cloneService').value] || ''; });
