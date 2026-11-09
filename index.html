@@ -1,0 +1,1633 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b1a1e">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="VoiceCraft">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<title>VoiceCraft Studio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Gloock&family=Hanken+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* Layout: sticky studio bar; Narrate = script booth (left) + console (right); Voice lab = one centered column.
+   Palette: studio night (teal-black felt) with brass as the single accent. Type: Gloock display, Hanken Grotesk body, IBM Plex Mono for meters. */
+:root {
+  --bg: #0b1a1e;
+  --surface: #11262b;
+  --surface-2: #173238;
+  --line: #25444b;
+  --fg: #ece5d3;
+  --muted: #93a8a8;
+  --accent: #e2b155;
+  --accent-fg: #1c1405;
+  --signal: #43d3c1;
+  --danger: #ff8a7a;
+  --hl: rgba(226, 177, 85, 0.2);
+  --font-display: 'Gloock', 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
+  --font-body: 'Hanken Grotesk', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace;
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --bg: #f3efe5;
+    --surface: #fbf9f3;
+    --surface-2: #ebe5d6;
+    --line: #d3cbb6;
+    --fg: #15292d;
+    --muted: #5b6f70;
+    --accent: #8f5f0d;
+    --accent-fg: #fffaf0;
+    --signal: #0a7a6e;
+    --danger: #b3341f;
+    --hl: rgba(143, 95, 13, 0.16);
+    color-scheme: light;
+  }
+}
+:root[data-theme="light"] {
+  --bg: #f3efe5;
+  --surface: #fbf9f3;
+  --surface-2: #ebe5d6;
+  --line: #d3cbb6;
+  --fg: #15292d;
+  --muted: #5b6f70;
+  --accent: #8f5f0d;
+  --accent-fg: #fffaf0;
+  --signal: #0a7a6e;
+  --danger: #b3341f;
+  --hl: rgba(143, 95, 13, 0.16);
+  color-scheme: light;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: 15px/1.55 var(--font-body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0 48px;
+}
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0 0 auto;
+  height: env(safe-area-inset-top, 0px);
+  background: var(--bg);
+  z-index: 10;
+}
+button, select, textarea, input { font: inherit; color: inherit; }
+button { cursor: pointer; }
+h1, h2, h3, p { margin: 0; }
+
+.wrap { max-width: 1180px; margin: 0 auto; }
+
+/* Studio bar */
+.top {
+  position: sticky;
+  top: env(safe-area-inset-top, 0px);
+  z-index: 9;
+  background: var(--bg);
+  border-bottom: 1px solid var(--line);
+}
+.top-in {
+  max-width: 1180px;
+  margin: 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 18px;
+  padding-block: 12px;
+}
+.brand { display: flex; align-items: center; gap: 10px; margin-right: auto; min-width: 0; }
+.brand svg { flex: none; color: var(--accent); }
+.brand-name { font: 22px/1 var(--font-display); letter-spacing: 0.2px; white-space: nowrap; }
+.tabs { display: flex; gap: 4px; padding: 3px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); }
+.tab {
+  border: 0; background: transparent; color: var(--muted);
+  padding: 8px 16px; border-radius: 999px; font-weight: 600; font-size: 14px; min-height: 36px;
+}
+.tab[aria-selected="true"] { background: var(--accent); color: var(--accent-fg); }
+.pill {
+  font: 500 12px var(--font-mono); color: var(--muted);
+  border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; white-space: nowrap;
+}
+
+/* Layout */
+.stage {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  gap: 20px;
+  padding-top: 22px;
+  align-items: start;
+}
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 20px; min-width: 0; }
+.row { display: flex; align-items: center; gap: 10px; }
+.between { justify-content: space-between; }
+.mono { font-family: var(--font-mono); }
+
+/* Booth */
+.booth { display: grid; gap: 14px; }
+.onair { display: flex; align-items: center; gap: 10px; }
+.onair h2 { font: 20px/1.1 var(--font-display); }
+.lamp { width: 10px; height: 10px; border-radius: 50%; background: var(--line); transition: background 0.2s, box-shadow 0.2s; }
+.lamp.live { background: var(--signal); box-shadow: 0 0 0 4px color-mix(in srgb, var(--signal) 25%, transparent); animation: breathe 1.6s ease-in-out infinite; }
+@keyframes breathe { 50% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--signal) 8%, transparent); } }
+.meta { font-size: 12px; color: var(--muted); }
+
+textarea#script, .prompter {
+  width: 100%;
+  min-height: 320px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 16px;
+}
+textarea#script { resize: vertical; font: 17px/1.75 var(--font-body); }
+textarea#script::placeholder { color: var(--muted); }
+.prompter {
+  position: relative;
+  max-height: min(52vh, 460px);
+  overflow: auto;
+  font: clamp(21px, 3.2vw, 28px)/1.6 var(--font-display);
+  color: var(--muted);
+}
+.w { border-radius: 4px; transition: color 0.15s; }
+.w.on { color: var(--fg); background: var(--hl); }
+.w.now { color: var(--accent); }
+
+.bar { height: 4px; background: var(--surface-2); border-radius: 4px; overflow: hidden; }
+.bar > div { height: 100%; width: 0; background: var(--accent); transition: width 0.3s; }
+
+.transport { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.spacer { flex: 1; }
+.btn {
+  border: 1px solid var(--line); background: var(--surface-2); color: var(--fg);
+  border-radius: 10px; padding: 10px 16px; font-weight: 600; font-size: 14px; min-height: 44px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+}
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); padding-inline: 22px; }
+.btn.ghost { background: transparent; }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn:focus-visible, .tab:focus-visible, .chip:focus-visible, .preset:focus-visible, .seg button:focus-visible, select:focus-visible, textarea:focus-visible, input:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 2px;
+}
+.status { font-size: 12.5px; color: var(--signal); min-height: 20px; overflow-wrap: anywhere; }
+
+.cloud-out { display: grid; gap: 10px; }
+.audio-card { background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
+.audio-card strong { font-size: 12px; }
+.audio-card audio { width: 100%; margin-top: 8px; }
+.audio-card a { display: inline-block; margin-top: 6px; font-size: 13px; color: var(--accent); }
+
+/* Console */
+.console { display: grid; gap: 0; padding: 0; }
+.blk { padding: 18px 20px; display: grid; gap: 12px; min-width: 0; }
+.blk + .blk { border-top: 1px solid var(--line); }
+.blk h3 { font: 500 11px var(--font-mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+.note { font-size: 12.5px; color: var(--muted); line-height: 1.5; }
+
+.seg { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; padding: 3px; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; }
+.seg button { border: 0; background: transparent; border-radius: 9px; padding: 9px 4px; font-weight: 600; font-size: 13px; min-width: 0; color: var(--muted); display: grid; gap: 1px; min-height: 48px; }
+.seg button small { font: 400 10.5px var(--font-mono); opacity: 0.85; overflow-wrap: anywhere; }
+.seg button[aria-pressed="true"] { background: var(--surface-2); color: var(--fg); box-shadow: inset 0 0 0 1px var(--accent); }
+
+.presets { display: grid; grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); gap: 8px; }
+.preset { text-align: left; border: 1px solid var(--line); background: var(--bg); border-radius: 12px; padding: 10px 12px; display: grid; gap: 2px; }
+.preset b { font: 16px/1.2 var(--font-display); font-weight: 400; }
+.preset span { font-size: 12px; color: var(--muted); }
+.preset[aria-pressed="true"] { border-color: var(--accent); background: var(--surface-2); }
+
+.chips { display: flex; flex-wrap: wrap; gap: 7px; }
+.chip { border: 1px solid var(--line); background: var(--bg); color: var(--muted); border-radius: 999px; padding: 8px 14px; font-size: 13.5px; font-weight: 600; min-height: 38px; }
+.chip[aria-pressed="true"] { border-color: var(--accent); color: var(--fg); background: var(--surface-2); }
+
+.field { display: grid; gap: 6px; }
+.field label, .slider label { font-size: 13px; font-weight: 600; display: flex; justify-content: space-between; gap: 10px; }
+.field output, .slider output { font: 12px var(--font-mono); color: var(--muted); }
+select, input[type="text"], input[type="password"] {
+  width: 100%; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 11px 12px; min-height: 44px;
+}
+.filters { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: end; }
+.check { display: flex; align-items: center; gap: 8px; font-size: 13px; min-height: 44px; }
+.check input { accent-color: var(--accent); width: 18px; height: 18px; }
+.slider { display: grid; gap: 4px; }
+input[type="range"] { width: 100%; accent-color: var(--accent); min-height: 28px; }
+
+.pair { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+.pair .btn { padding-inline: 14px; }
+
+/* Voice lab */
+.lab { max-width: 760px; margin: 0 auto; padding-top: 22px; display: grid; gap: 18px; }
+.lab h2 { font: 26px/1.15 var(--font-display); }
+.drop {
+  border: 1.5px dashed var(--line); border-radius: 14px; padding: 26px 18px; text-align: center;
+  display: grid; gap: 8px; justify-items: center; background: var(--bg);
+}
+.drop.over { border-color: var(--accent); background: var(--surface-2); }
+.drop input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.steps { margin: 0; padding-left: 1.2em; color: var(--muted); font-size: 13.5px; display: grid; gap: 4px; }
+.wave { position: relative; height: 120px; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.wave canvas { width: 100%; height: 100%; display: block; }
+.wave .played { position: absolute; inset: 0 auto 0 0; width: 0; background: var(--hl); pointer-events: none; }
+.wave .empty { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font-size: 13px; padding: 12px; text-align: center; }
+.two { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px 22px; }
+.callout { border-left: 3px solid var(--accent); padding: 4px 0 4px 14px; color: var(--muted); font-size: 13.5px; }
+.callout b { color: var(--fg); }
+
+.banner { margin-top: 16px; padding: 12px 16px; border: 1px solid var(--accent); border-radius: 12px; background: var(--surface); font-size: 13.5px; color: var(--fg); }
+.banner b { color: var(--accent); }
+
+footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); color: var(--muted); }
+
+@media (max-width: 880px) {
+  .stage { grid-template-columns: minmax(0, 1fr); }
+  .card { padding: 16px; }
+  .blk { padding: 16px; }
+  .pill { display: none; }
+  .tabs { order: 3; width: 100%; }
+  .tab { flex: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lamp.live { animation: none; }
+  .bar > div, .w { transition: none; }
+}
+</style>
+<script src="https://js.puter.com/v2/"></script>
+</head>
+<body>
+
+<header class="top">
+  <div class="top-in">
+    <div class="brand">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <rect x="9" y="2.5" width="6" height="12" rx="3"></rect>
+        <path d="M5.5 11.5a6.5 6.5 0 0 0 13 0"></path>
+        <path d="M12 18v3.5M8.5 21.5h7"></path>
+      </svg>
+      <span class="brand-name">VoiceCraft Studio</span>
+    </div>
+    <nav class="tabs" role="tablist" aria-label="Studio sections">
+      <button class="tab" role="tab" id="tab-narrate" data-view="narrate" aria-selected="true">Narrate</button>
+      <button class="tab" role="tab" id="tab-lab" data-view="voice-lab" aria-selected="false">Voice lab</button>
+    </nav>
+    <span class="pill" id="enginePill">Device voices · free</span>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="banner" id="previewBanner" hidden>
+    <b>Preview mode.</b> Device voices and the recording effects work here. Puter, Fish Audio, ElevenLabs and voice cloning only work in the standalone file, because this preview page is blocked from contacting them.
+  </div>
+  <section id="view-narrate" aria-labelledby="tab-narrate">
+    <div class="stage">
+      <div class="booth card">
+        <div class="row between">
+          <div class="onair"><span class="lamp" id="lamp"></span><h2>Script</h2></div>
+          <div class="meta mono"><span id="count">0 characters</span> · <span id="est">≈ 0:00</span></div>
+        </div>
+        <textarea id="script" spellcheck="true" aria-label="Narration script" placeholder="Paste your story here. Leave a blank line between paragraphs for a longer pause."></textarea>
+        <div class="prompter" id="prompter" hidden aria-label="Script being read"></div>
+        <div class="bar" aria-hidden="true"><div id="bar"></div></div>
+        <div class="transport">
+          <button class="btn primary" id="play" type="button">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15l13-7.5z"></path></svg>
+            <span id="playLabel">Speak</span>
+          </button>
+          <button class="btn" id="pause" type="button" disabled>Pause</button>
+          <button class="btn" id="stop" type="button" disabled>Stop</button>
+          <span class="spacer"></span>
+          <button class="btn ghost" id="sample" type="button">Sample</button>
+          <button class="btn ghost" id="clear" type="button">Clear</button>
+        </div>
+        <p class="status mono" id="status" role="status" aria-live="polite">Ready.</p>
+        <div class="cloud-out" id="cloudOut" hidden></div>
+      </div>
+
+      <aside class="console card" aria-label="Voice controls">
+        <section class="blk">
+          <h3>Engine</h3>
+          <div class="seg" id="engineSeg">
+            <button type="button" data-engine="device" aria-pressed="true">Device<small>free, offline</small></button>
+            <button type="button" data-engine="cloud" aria-pressed="false">Puter<small id="cloudTag">cloud</small></button>
+            <button type="button" data-engine="keys" aria-pressed="false">Pro keys<small id="keysTag">Fish · Eleven</small></button>
+          </div>
+          <p class="note" id="engineNote"></p>
+        </section>
+
+        <section class="blk">
+          <h3>Voice character</h3>
+          <div class="presets" id="presets"></div>
+        </section>
+
+        <section class="blk" id="deviceVoice">
+          <h3>Voice</h3>
+          <div class="filters">
+            <div class="field">
+              <label for="lang">Language</label>
+              <select id="lang"></select>
+            </div>
+            <label class="check" for="maleFirst"><input type="checkbox" id="maleFirst"> Male first</label>
+          </div>
+          <div class="field">
+            <label for="voice">Voice <output id="voiceCount"></output></label>
+            <select id="voice"></select>
+          </div>
+          <p class="note">♂ marks voices whose names suggest a male voice. Your device decides what is installed. Some online browser voices ignore pitch and pace.</p>
+        </section>
+
+        <section class="blk" id="cloudVoice" hidden>
+          <h3>Cloud voice</h3>
+          <div class="field"><label for="cProvider">Provider</label><select id="cProvider"></select></div>
+          <div class="field"><label for="cVoice">Voice</label><select id="cVoice"></select></div>
+          <div class="field" id="cModelField"><label for="cModel">Model</label><select id="cModel"></select></div>
+          <div class="field"><label for="direction">Extra direction</label><input type="text" id="direction" placeholder="e.g. Warm Kenyan storyteller, mature voice"></div>
+          <p class="note">★ marks suggestions for deep male narration. Each section is a separate request to the provider, so limits or charges from your Puter account can apply.</p>
+        </section>
+
+        <section class="blk" id="keysVoice" hidden>
+          <h3>Pro voice</h3>
+          <div class="field"><label for="kService">Service</label><select id="kService"></select></div>
+          <div class="field"><label for="keyIn">API key</label><input type="password" id="keyIn" autocomplete="off" spellcheck="false" placeholder="Paste your key"></div>
+          <label class="check" for="rememberKeys"><input type="checkbox" id="rememberKeys"> Remember keys on this device</label>
+          <div class="field"><label for="kModel">Model</label><select id="kModel"></select></div>
+          <div class="field" id="kScopeField"><label for="kScope">Voices</label><select id="kScope"><option value="mine">My voices</option><option value="library">Public library</option></select></div>
+          <div class="pair">
+            <input type="text" id="kSearch" placeholder="Search, e.g. deep male narrator" aria-label="Search voices" autocomplete="off">
+            <button class="btn" id="kLoad" type="button">Load voices</button>
+          </div>
+          <div class="field"><label for="kVoice">Voice <output id="kCount"></output></label><select id="kVoice"></select></div>
+          <div class="field"><label for="kVoiceManual">Or paste a voice ID</label><input type="text" id="kVoiceManual" autocomplete="off" spellcheck="false"></div>
+          <p class="note" id="kNote"></p>
+          <p class="note">Your key stays in this browser and goes only to the service you pick. Anyone using this device with keys remembered could spend your credit.</p>
+        </section>
+
+        <section class="blk">
+          <h3>Emotion</h3>
+          <div class="chips" id="moods"></div>
+          <div class="slider">
+            <label for="intensity">Intensity <output id="intOut"></output></label>
+            <input type="range" id="intensity" min="0" max="100" step="5">
+          </div>
+        </section>
+
+        <section class="blk" id="tuneBlk">
+          <h3>Fine tune</h3>
+          <div class="slider" id="pitchWrap"><label for="pitch">Pitch, lower is deeper <output id="pitchOut"></output></label><input type="range" id="pitch" min="0.1" max="1.5" step="0.05"></div>
+          <div class="slider"><label for="rate">Pace <output id="rateOut"></output></label><input type="range" id="rate" min="0.5" max="1.4" step="0.05"></div>
+          <div class="slider" id="pauseWrap"><label for="pause_scale">Pauses <output id="pauseOut"></output></label><input type="range" id="pause_scale" min="0.5" max="2.5" step="0.1"></div>
+          <div class="slider" id="volWrap"><label for="volume">Volume <output id="volOut"></output></label><input type="range" id="volume" min="0.2" max="1" step="0.05"></div>
+          <button class="btn" id="hear" type="button">Hear a sample line</button>
+        </section>
+      </aside>
+    </div>
+  </section>
+
+  <section id="view-lab" hidden aria-labelledby="tab-lab">
+    <div class="lab">
+      <div class="card" style="display:grid;gap:14px">
+        <h2>Make a recording deeper</h2>
+        <p class="note">Load a voice recording and reshape it: lower the pitch, add chest warmth, and place it in a room. Everything runs on this device. Your file is not uploaded anywhere.</p>
+        <label class="drop" id="drop" for="file">
+          <strong id="dropTitle">Choose a recording or drop it here</strong>
+          <span class="note" id="dropSub">MP3, WAV, M4A or OGG</span>
+          <input type="file" id="file" accept="audio/*">
+          <span class="btn" aria-hidden="true">Browse files</span>
+        </label>
+        <div class="wave" id="wave">
+          <canvas id="canvas"></canvas>
+          <div class="played" id="played"></div>
+          <div class="empty" id="waveEmpty">Your waveform appears here</div>
+        </div>
+        <div class="chips" id="labPresets">
+          <button class="chip" type="button" data-p="-3,6,10" aria-pressed="false">Baritone</button>
+          <button class="chip" type="button" data-p="-6,9,8" aria-pressed="false">Deep bass</button>
+          <button class="chip" type="button" data-p="-4,7,35" aria-pressed="false">Cinema</button>
+          <button class="chip" type="button" data-p="0,0,0" aria-pressed="false">Original</button>
+        </div>
+        <div class="two">
+          <div class="slider"><label for="depth">Depth <output id="depthOut"></output></label><input type="range" id="depth" min="-12" max="0" step="0.5" value="-4"></div>
+          <div class="slider"><label for="warmth">Warmth <output id="warmthOut"></output></label><input type="range" id="warmth" min="0" max="12" step="0.5" value="6"></div>
+          <div class="slider"><label for="room">Room <output id="roomOut"></output></label><input type="range" id="room" min="0" max="60" step="1" value="12"></div>
+        </div>
+        <div class="transport">
+          <button class="btn primary" id="labPlay" type="button" disabled>Play with effects</button>
+          <button class="btn" id="labStop" type="button" disabled>Stop</button>
+          <span class="meta mono" id="labInfo"></span>
+        </div>
+        <p class="status mono" id="labStatus" role="status" aria-live="polite">Load a recording to begin.</p>
+        <ol class="steps">
+          <li>Pick a clear recording with little background noise.</li>
+          <li>Choose a preset, then adjust depth, warmth and room by ear.</li>
+          <li>Lower depth also slows the clip, the way slowed tape does.</li>
+        </ol>
+      </div>
+      <div class="card" style="display:grid;gap:14px" id="revoiceCard">
+        <h2>Re-voice with a cloud voice</h2>
+        <p class="note" id="revoiceNote">Converts the recording you loaded above into a different voice and keeps your timing and delivery. The result is a preset voice speaking your performance, not a copy of your own voice.</p>
+        <div class="field">
+          <label for="rvVoice">Target voice <output id="rvCount"></output></label>
+          <select id="rvVoice" disabled></select>
+        </div>
+        <div class="transport">
+          <button class="btn primary" id="rvGo" type="button" disabled>Convert recording</button>
+        </div>
+        <p class="status mono" id="rvStatus" role="status" aria-live="polite"></p>
+        <div class="cloud-out" id="rvOut"></div>
+      </div>
+      <div class="card" style="display:grid;gap:14px" id="cloneCard">
+        <h2>Clone your voice</h2>
+        <p class="note" id="cloneNote">Trains a private voice from the recording you loaded above, then selects it under Pro keys in Narrate. Use one clear speaker with no music, at least 10 seconds. A minute or two sounds better.</p>
+        <div class="two">
+          <div class="field"><label for="cloneService">Service</label><select id="cloneService"></select></div>
+          <div class="field"><label for="cloneKey">API key</label><input type="password" id="cloneKey" autocomplete="off" spellcheck="false" placeholder="Paste your key"></div>
+        </div>
+        <div class="field"><label for="cloneName">Voice name</label><input type="text" id="cloneName" value="My voice"></div>
+        <label class="check" for="cloneConsent"><input type="checkbox" id="cloneConsent"> This is my own voice, or the speaker has given me permission.</label>
+        <div class="transport"><button class="btn primary" id="cloneGo" type="button" disabled>Create cloned voice</button></div>
+        <p class="status mono" id="cloneStatus" role="status" aria-live="polite"></p>
+      </div>
+      <div class="callout">
+        <b>Two different things.</b> The effects and Re-voice change a recording you already have. Cloning trains a voice at Fish Audio or ElevenLabs from your sample, and that voice can then read any new text. Their plans decide whether cloning is included, and ElevenLabs lists instant cloning from its Starter plan.
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>Device voices run on your phone or computer and nothing leaves it. Puter voices, Pro keys and cloning send your text or recording to the service you choose.</footer>
+
+<script>
+(function () {
+  'use strict';
+  var STANDALONE = true;
+
+  var $ = function (id) { return document.getElementById(id); };
+  var synth = ('speechSynthesis' in window) ? window.speechSynthesis : null;
+  var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var clamp = function (v, a, b) { return Math.min(b, Math.max(a, v)); };
+
+  var LS = 'voicecraft.v2';
+  var SAMPLE = 'Some stories do not begin with a warning.\n\nThey begin quietly, in ordinary homes, with ordinary people carrying extraordinary dreams.\n\nAnd sometimes, life takes a turn nobody prepared us for.\n\nWhat remains is the courage to keep walking, even when the road ahead is difficult.';
+  var HEAR = 'Some stories do not begin with a warning. They begin quietly, in ordinary homes.';
+
+  var PRESETS = {
+    baritone: { name: 'Baritone', note: 'Warm and grounded', pitch: 0.6, rate: 0.9, deep: true },
+    bass: { name: 'Deep bass', note: 'Low and weighty', pitch: 0.3, rate: 0.82, deep: true },
+    trailer: { name: 'Trailer', note: 'Slow and cinematic', pitch: 0.4, rate: 0.78, deep: true },
+    elder: { name: 'Elder', note: 'Wise storyteller', pitch: 0.5, rate: 0.8, deep: true },
+    natural: { name: 'Natural', note: 'Voice as installed', pitch: 1, rate: 1, deep: false }
+  };
+
+  var MOODS = {
+    dramatic:  { label: 'Dramatic',  pitch: -0.12, rate: 0.88, vol: 1,    pause: 1.6, phrases: true,  endDrop: true,  lift: false, text: 'Deliver this as a cinematic storyteller. Use deliberate pacing, meaningful pauses and controlled intensity.' },
+    emotional: { label: 'Emotional', pitch: 0.04,  rate: 0.92, vol: 0.95, pause: 1.3, phrases: true,  endDrop: true,  lift: false, text: 'Speak with sincere emotion and human warmth. Let important moments breathe without becoming melodramatic.' },
+    sad:       { label: 'Sad',       pitch: -0.15, rate: 0.8,  vol: 0.85, pause: 1.7, phrases: true,  endDrop: true,  lift: false, text: 'Use a subdued, reflective and tender delivery. Keep the pace measured.' },
+    hopeful:   { label: 'Hopeful',   pitch: 0.12,  rate: 0.97, vol: 1,    pause: 1.1, phrases: false, endDrop: false, lift: true,  text: 'Sound warm, reassuring and quietly optimistic. Build a sense of hope.' },
+    calm:      { label: 'Calm',      pitch: -0.04, rate: 0.86, vol: 0.9,  pause: 1.3, phrases: false, endDrop: false, lift: false, text: 'Speak gently, steadily and clearly, with relaxed pacing.' },
+    energetic: { label: 'Energetic', pitch: 0.18,  rate: 1.15, vol: 1,    pause: 0.7, phrases: false, endDrop: false, lift: false, text: 'Use lively, engaging energy and confident articulation.' },
+    neutral:   { label: 'Neutral',   pitch: 0,     rate: 1,    vol: 1,    pause: 1,   phrases: false, endDrop: false, lift: false, text: 'Use natural, clear conversational narration.' }
+  };
+
+  var CLOUD = {
+    openai: {
+      label: 'OpenAI',
+      voices: ['alloy', 'ash', 'coral', 'echo', 'fable', 'nova', 'onyx', 'sage', 'shimmer', 'ballad', 'verse', 'marin', 'cedar'],
+      models: ['gpt-4o-mini-tts', 'tts-1', 'tts-1-hd'],
+      star: ['onyx', 'ash', 'echo']
+    },
+    gemini: {
+      label: 'Google Gemini',
+      voices: ['Kore', 'Zephyr', 'Puck', 'Charon', 'Fenrir', 'Leda', 'Orus', 'Aoede', 'Callirrhoe', 'Autonoe', 'Enceladus', 'Iapetus', 'Umbriel', 'Algieba', 'Despina', 'Erinome', 'Algenib', 'Rasalgethi', 'Laomedeia', 'Achernar', 'Alnilam', 'Schedar', 'Gacrux', 'Pulcherrima', 'Achird', 'Sulafat'],
+      models: ['gemini-3.8-flash-tts', 'gemini-3.8-flash-lite-tts'],
+      star: ['Charon', 'Fenrir', 'Orus', 'Algenib', 'Alnilam']
+    },
+    elevenlabs: {
+      label: 'ElevenLabs',
+      voices: ['Rachel', 'Bella', 'Antoni', 'Josh', 'Arnold', 'Adam', 'Elli', 'Sam', 'Domi'],
+      models: ['eleven_multilingual_v2', 'eleven_v3', 'eleven_flash_v2_5'],
+      star: ['Adam', 'Josh', 'Arnold', 'Antoni']
+    },
+    'aws-polly': {
+      label: 'Amazon Polly',
+      voices: ['Joanna', 'Matthew', 'Ruth', 'Stephen', 'Amy', 'Brian', 'Emma', 'Ivy', 'Kendra', 'Kimberly', 'Salli'],
+      models: ['neural', 'generative', 'long-form', 'standard'],
+      star: ['Matthew', 'Stephen', 'Brian']
+    },
+    xai: {
+      label: 'xAI Grok',
+      voices: ['eve', 'ara', 'rex', 'sal', 'leo'],
+      models: ['Default'],
+      star: ['rex', 'sal']
+    },
+    speechify: {
+      label: 'Speechify',
+      voices: ['geffen_32', 'dominic_32', 'harper_32', 'hugh_32', 'imogen_32'],
+      models: ['simba-3.2'],
+      star: ['geffen_32', 'dominic_32', 'hugh_32']
+    }
+  };
+
+  /* ---------- state ---------- */
+  var stored = {};
+  try { stored = JSON.parse(localStorage.getItem(LS) || '{}') || {}; } catch (e) { stored = {}; }
+  var S = Object.assign({
+    engine: 'device', mood: 'dramatic', intensity: 70, preset: 'baritone',
+    pitch: 0.6, rate: 0.9, pauseScale: 1, volume: 1, lang: 'en', maleFirst: true, voiceURI: '',
+    cProvider: 'openai', cVoice: 'onyx', cModel: 'gpt-4o-mini-tts', direction: '',
+    kService: 'fish', kScope: 'mine', rememberKeys: false,
+    kmod_fish: 's2.1-pro-free', kmod_eleven: 'eleven_multilingual_v2'
+  }, stored.settings || {});
+  if (!MOODS[S.mood]) S.mood = 'dramatic';
+  if (['device', 'cloud', 'keys'].indexOf(S.engine) < 0) S.engine = 'device';
+  if (S.engine !== 'device' && !STANDALONE) S.engine = 'device';
+
+  var persistTimer = null;
+  function persist() {
+    clearTimeout(persistTimer);
+    persistTimer = setTimeout(function () {
+      try { localStorage.setItem(LS, JSON.stringify({ script: $('script').value, settings: S })); } catch (e) { /* storage unavailable */ }
+    }, 250);
+  }
+  function setStatus(msg) { $('status').textContent = msg; }
+
+  /* ---------- tabs ---------- */
+  function showView(name) {
+    var lab = name === 'voice-lab';
+    $('view-narrate').hidden = lab;
+    $('view-lab').hidden = !lab;
+    $('tab-narrate').setAttribute('aria-selected', String(!lab));
+    $('tab-lab').setAttribute('aria-selected', String(lab));
+    if (lab) drawWave();
+  }
+  document.querySelectorAll('.tab').forEach(function (b) {
+    b.addEventListener('click', function () {
+      showView(b.dataset.view);
+      try { location.hash = b.dataset.view; } catch (e) { /* hash unavailable */ }
+    });
+  });
+  window.addEventListener('hashchange', function () { showView(location.hash.slice(1)); });
+
+  /* ---------- device voices ---------- */
+  var voices = [];
+  var FEMALE = /\bfemale\b|woman|girl|samantha|zira|hazel|susan|karen|moira|tessa|fiona|victoria|allison|\bava\b|kate\b|serena|\bamy\b|emma|joanna|salli|kimberly|\bivy\b|kendra|nicky|libby|sonia|jenny|aria|michelle|\bana\b|helena|laura|paulina|monica|lucia|catherine|heather|\bsara\b|ellen|alice|anna\b|claire|milena|yelda|zosia|ioana|tracy|ruth/i;
+  var MALE = /\bmale\b|david|\bmark\b|daniel|james|george|\bguy\b|ryan|\balex\b|\bfred\b|thomas|oliver|arthur|aaron|rishi|gordon|liam|\beric\b|christopher|roger|brian|andrew|davis|tony|jason|jacob|henry|\blee\b|neil|jorge|diego|juan|pablo|\bluca\b|yuri|bruce|ralph|albert|\breed\b|eddy|evan|sean|wayne|ravi|hemant|stefan|stefano|jacques|\bpaul\b|rocko|junior/i;
+  function guessMale(v) {
+    var n = v.name;
+    if (/\bfemale\b/i.test(n)) return false;
+    if (/\bmale\b/i.test(n)) return true;
+    if (FEMALE.test(n)) return false;
+    return MALE.test(n);
+  }
+  function langName(code) {
+    try { return new Intl.DisplayNames(['en'], { type: 'language' }).of(code) || code; } catch (e) { return code; }
+  }
+  function loadVoices() {
+    if (!synth) return;
+    voices = synth.getVoices().slice();
+    var codes = [];
+    voices.forEach(function (v) {
+      var c = v.lang.split(/[-_]/)[0].toLowerCase();
+      if (codes.indexOf(c) < 0) codes.push(c);
+    });
+    codes.sort();
+    var sel = $('lang');
+    sel.textContent = '';
+    var all = document.createElement('option');
+    all.value = 'all'; all.textContent = 'All languages';
+    sel.appendChild(all);
+    codes.forEach(function (c) {
+      var o = document.createElement('option');
+      o.value = c; o.textContent = langName(c);
+      sel.appendChild(o);
+    });
+    S.lang = (S.lang === 'all' || codes.indexOf(S.lang) >= 0) ? S.lang : (codes.indexOf('en') >= 0 ? 'en' : 'all');
+    sel.value = S.lang;
+    fillVoiceSelect();
+  }
+  function fillVoiceSelect() {
+    var list = voices.filter(function (v) { return S.lang === 'all' || v.lang.toLowerCase().indexOf(S.lang) === 0; });
+    list.sort(function (a, b) {
+      var am = guessMale(a), bm = guessMale(b);
+      if (S.maleFirst && am !== bm) return am ? -1 : 1;
+      if (a.localService !== b.localService) return a.localService ? -1 : 1;
+      return a.name.localeCompare(b.name);
+    });
+    var sel = $('voice');
+    sel.textContent = '';
+    list.forEach(function (v) {
+      var o = document.createElement('option');
+      o.value = v.voiceURI;
+      o.textContent = (guessMale(v) ? '♂ ' : '') + v.name + ' (' + v.lang + ')';
+      sel.appendChild(o);
+    });
+    if (!list.length) {
+      var none = document.createElement('option');
+      none.textContent = synth ? 'No voices found yet' : 'Speech is not supported here';
+      sel.appendChild(none);
+    }
+    var keep = list.filter(function (v) { return v.voiceURI === S.voiceURI; })[0];
+    var pick = keep || list[0];
+    if (pick) { sel.value = pick.voiceURI; S.voiceURI = pick.voiceURI; }
+    $('voiceCount').textContent = list.length + (list.length === 1 ? ' voice' : ' voices');
+  }
+  function currentVoice() {
+    return voices.filter(function (v) { return v.voiceURI === S.voiceURI; })[0] || null;
+  }
+
+  /* ---------- delivery model ---------- */
+  function effective() {
+    var m = MOODS[S.mood], i = S.intensity / 100;
+    return {
+      pitch: S.pitch + m.pitch * i,
+      rate: S.rate * (1 + (m.rate - 1) * i),
+      vol: S.volume * (1 + (m.vol - 1) * i),
+      pauseMul: (1 + (m.pause - 1) * i) * S.pauseScale,
+      m: m, i: i
+    };
+  }
+
+  function segment(text) {
+    var out = [], start = 0, i = 0, n = text.length;
+    function push(end) {
+      var raw = text.slice(start, end), t = raw.trim();
+      if (t) { var s = start + raw.indexOf(t); out.push({ text: t, start: s, end: s + t.length }); }
+    }
+    while (i < n) {
+      var c = text[i];
+      if (c === '\n') { push(i); start = i + 1; i++; continue; }
+      if ('.!?'.indexOf(c) >= 0) {
+        var j = i + 1;
+        while (j < n && '.!?'.indexOf(text[j]) >= 0) j++;
+        while (j < n && '"\'”’)]'.indexOf(text[j]) >= 0) j++;
+        if (j >= n || /\s/.test(text[j])) { push(j); start = j; }
+        i = j; continue;
+      }
+      i++;
+    }
+    push(n);
+    return out;
+  }
+
+  function phrases(sg) {
+    var out = [], re = /[^,;:—–]+[,;:—–]*\s*/g, m, cur = null;
+    while ((m = re.exec(sg.text))) {
+      var s = sg.start + m.index, t = m[0];
+      if (cur && cur.text.length < 18) { cur.text += t; cur.end = s + t.length; }
+      else { if (cur) out.push(cur); cur = { text: t, start: s, end: s + t.length }; }
+    }
+    if (cur) {
+      if (out.length && cur.text.length < 18) { var p = out[out.length - 1]; p.text += cur.text; p.end = cur.end; }
+      else out.push(cur);
+    }
+    return out.length ? out : [sg];
+  }
+
+  function buildQueue(text) {
+    var e = effective(), segs = segment(text), q = [];
+    segs.forEach(function (sg, k) {
+      var next = segs[k + 1];
+      var gap = next ? text.slice(sg.end, next.start) : '';
+      var paraEnd = !next || /\n\s*\n/.test(gap);
+      var lineEnd = !!next && !paraEnd && /\n/.test(gap);
+      var tail = sg.text.replace(/["'”’)\]]+$/, '');
+      var ell = /(\.\.\.|…)$/.test(tail);
+      var last = tail.slice(-1);
+      var pitch = e.pitch, rate = e.rate, vol = e.vol;
+      if (last === '?') pitch += 0.1 * e.i;
+      if (last === '!') { rate *= 1 + 0.06 * e.i; pitch += 0.06 * e.i; vol = Math.min(1, vol * 1.1); }
+      if (ell) rate *= 1 - 0.08 * e.i;
+      if (paraEnd && e.m.endDrop) { pitch -= 0.08 * e.i; rate *= 1 - 0.08 * e.i; }
+      if (paraEnd && e.m.lift) pitch += 0.05 * e.i;
+      var pause = 350;
+      if (last === '?' || last === '!') pause = 400;
+      if (ell) pause += 500;
+      if (lineEnd) pause += 250;
+      if (paraEnd) pause += 650;
+      if (!next) pause = 0;
+      pause = Math.round(pause * e.pauseMul);
+      var parts = e.m.phrases ? phrases(sg) : [sg];
+      parts.forEach(function (p, pi) {
+        q.push({
+          text: p.text, start: p.start, end: p.end,
+          pitch: clamp(pitch, 0.1, 2), rate: clamp(rate, 0.5, 1.8), volume: clamp(vol, 0, 1),
+          pause: pi === parts.length - 1 ? pause : Math.round(170 * e.pauseMul)
+        });
+      });
+    });
+    return q;
+  }
+
+  /* ---------- prompter ---------- */
+  var words = [], phraseEls = [], wordEl = null;
+  function buildPrompter(text) {
+    var p = $('prompter'), re = /\S+/g, m, last = 0;
+    p.textContent = ''; words = []; phraseEls = []; wordEl = null;
+    while ((m = re.exec(text))) {
+      var gap = text.slice(last, m.index);
+      var nl = (gap.match(/\n/g) || []).length;
+      if (last > 0 || words.length) {
+        if (nl === 0) p.appendChild(document.createTextNode(' '));
+        else for (var k = 0; k < Math.min(nl, 2); k++) p.appendChild(document.createElement('br'));
+      }
+      var sp = document.createElement('span');
+      sp.className = 'w'; sp.textContent = m[0];
+      p.appendChild(sp);
+      words.push({ el: sp, start: m.index, end: m.index + m[0].length });
+      last = m.index + m[0].length;
+    }
+  }
+  function idxAt(pos) {
+    var lo = 0, hi = words.length - 1, r = -1;
+    while (lo <= hi) {
+      var mid = (lo + hi) >> 1;
+      if (words[mid].start <= pos) { r = mid; lo = mid + 1; } else hi = mid - 1;
+    }
+    return r;
+  }
+  function keepInView(el) {
+    var p = $('prompter'), top = el.offsetTop, h = p.clientHeight;
+    if (top < p.scrollTop + h * 0.2 || top > p.scrollTop + h * 0.65) {
+      p.scrollTo({ top: Math.max(0, top - h * 0.4), behavior: reduced ? 'auto' : 'smooth' });
+    }
+  }
+  function markPhrase(it) {
+    phraseEls.forEach(function (w) { w.el.classList.remove('on'); });
+    phraseEls = [];
+    var a = idxAt(it.start), b = idxAt(it.end - 1);
+    if (a < 0) return;
+    for (var k = a; k <= b; k++) { words[k].el.classList.add('on'); phraseEls.push(words[k]); }
+    if (wordEl) wordEl.classList.remove('now');
+    wordEl = words[a].el; wordEl.classList.add('now');
+    keepInView(wordEl);
+  }
+  function markWord(pos) {
+    var k = idxAt(pos);
+    if (k < 0) return;
+    if (wordEl) wordEl.classList.remove('now');
+    wordEl = words[k].el; wordEl.classList.add('now');
+    keepInView(wordEl);
+  }
+
+  /* ---------- playback ---------- */
+  var queue = [], sid = 0, state = 'idle', timer = null, prompting = true, cloudBusy = false, cloudCancel = false;
+
+  function ui() {
+    var active = state !== 'idle';
+    $('lamp').classList.toggle('live', state === 'speaking' || cloudBusy);
+    $('prompter').hidden = !(active && prompting);
+    $('script').hidden = active && prompting;
+    var cloud = S.engine !== 'device';
+    $('play').disabled = cloud ? cloudBusy : (state === 'speaking');
+    $('playLabel').textContent = cloud ? 'Generate' : (state === 'paused' ? 'Resume' : 'Speak');
+    $('pause').disabled = cloud || !(state === 'speaking' || state === 'paused');
+    $('pause').textContent = state === 'paused' ? 'Resume' : 'Pause';
+    $('stop').disabled = cloud ? !cloudBusy : !active;
+    $('hear').disabled = cloud || !synth;
+  }
+
+  function finish() {
+    clearTimeout(timer);
+    state = 'idle';
+    if (wordEl) wordEl.classList.remove('now');
+    phraseEls.forEach(function (w) { w.el.classList.remove('on'); });
+    ui();
+  }
+
+  function speakAt(i, my) {
+    if (my !== sid) return;
+    if (i >= queue.length) { $('bar').style.width = '100%'; setStatus('Finished.'); finish(); return; }
+    var it = queue[i], u = new SpeechSynthesisUtterance(it.text), v = currentVoice();
+    if (v) { u.voice = v; u.lang = v.lang; }
+    u.pitch = it.pitch; u.rate = it.rate; u.volume = it.volume;
+    u.onstart = function () {
+      if (my !== sid) return;
+      markPhrase(it);
+      $('bar').style.width = Math.round((i / queue.length) * 100) + '%';
+      setStatus('Reading part ' + (i + 1) + ' of ' + queue.length);
+    };
+    u.onboundary = function (e) {
+      if (my !== sid) return;
+      if (e.name && e.name !== 'word') return;
+      markWord(it.start + e.charIndex);
+    };
+    u.onend = function () {
+      if (my !== sid) return;
+      timer = setTimeout(function () { speakAt(i + 1, my); }, it.pause);
+    };
+    u.onerror = function (e) {
+      if (my !== sid) return;
+      if (e.error === 'canceled' || e.error === 'interrupted') return;
+      setStatus('Speech stopped: ' + (e.error || 'unknown error'));
+      finish();
+    };
+    synth.speak(u);
+  }
+
+  function begin(text, showPrompter) {
+    queue = buildQueue(text);
+    if (!queue.length) return;
+    prompting = showPrompter;
+    if (showPrompter) buildPrompter(text); else { words = []; phraseEls = []; wordEl = null; }
+    sid++;
+    var my = sid;
+    state = 'speaking';
+    $('bar').style.width = '0%';
+    ui();
+    $('prompter').scrollTop = 0;
+    clearTimeout(timer);
+    synth.cancel();
+    setTimeout(function () { speakAt(0, my); }, 60);
+  }
+
+  function play() {
+    if (S.engine === 'cloud') { cloudGenerate(); return; }
+    if (S.engine === 'keys') { keysGenerate(); return; }
+    if (!synth) { setStatus('This browser has no speech engine. Try Chrome, Edge or Safari.'); return; }
+    if (state === 'paused') { synth.resume(); state = 'speaking'; ui(); return; }
+    if (state === 'speaking') return;
+    var text = $('script').value;
+    if (!text.trim()) { setStatus('Write or paste a script first.'); return; }
+    begin(text, true);
+  }
+  function pauseToggle() {
+    if (!synth) return;
+    if (state === 'speaking') { synth.pause(); state = 'paused'; setStatus('Paused.'); ui(); }
+    else if (state === 'paused') { synth.resume(); state = 'speaking'; ui(); }
+  }
+  function stop() {
+    if (S.engine !== 'device') {
+      cloudCancel = true;
+      if (kAbort) kAbort.abort();
+      setStatus('Stopping.');
+      return;
+    }
+    sid++;
+    clearTimeout(timer);
+    if (synth) synth.cancel();
+    $('bar').style.width = '0%';
+    setStatus('Stopped.');
+    finish();
+  }
+  function hear() {
+    if (!synth) return;
+    if (state !== 'idle') stop();
+    begin(HEAR, false);
+  }
+
+  /* ---------- meta ---------- */
+  function refreshMeta() {
+    var t = $('script').value;
+    $('count').textContent = t.length.toLocaleString() + ' characters';
+    var n = t.trim() ? t.trim().split(/\s+/).length : 0;
+    var e = effective();
+    var secs = n ? n / (2.6 * clamp(e.rate, 0.5, 1.8)) + segment(t).length * 0.35 * e.pauseMul : 0;
+    secs = Math.round(secs);
+    $('est').textContent = '≈ ' + Math.floor(secs / 60) + ':' + String(secs % 60).padStart(2, '0');
+  }
+
+  /* ---------- controls ---------- */
+  function renderPresets() {
+    var box = $('presets');
+    box.textContent = '';
+    Object.keys(PRESETS).forEach(function (k) {
+      var p = PRESETS[k], b = document.createElement('button');
+      b.type = 'button'; b.className = 'preset'; b.dataset.key = k;
+      var t = document.createElement('b'); t.textContent = p.name;
+      var d = document.createElement('span'); d.textContent = p.note;
+      b.appendChild(t); b.appendChild(d);
+      b.addEventListener('click', function () {
+        S.preset = k; S.pitch = p.pitch; S.rate = p.rate;
+        syncControls(); persist(); refreshMeta();
+      });
+      box.appendChild(b);
+    });
+  }
+  function renderMoods() {
+    var box = $('moods');
+    box.textContent = '';
+    Object.keys(MOODS).forEach(function (k) {
+      var b = document.createElement('button');
+      b.type = 'button'; b.className = 'chip'; b.dataset.mood = k; b.textContent = MOODS[k].label;
+      b.addEventListener('click', function () { S.mood = k; syncControls(); persist(); refreshMeta(); });
+      box.appendChild(b);
+    });
+  }
+  function syncControls() {
+    document.querySelectorAll('.preset').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.key === S.preset)); });
+    document.querySelectorAll('#moods .chip').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.mood === S.mood)); });
+    $('intensity').value = S.intensity; $('intOut').textContent = S.intensity + '%';
+    $('pitch').value = S.pitch;
+    $('pitchOut').textContent = S.pitch.toFixed(2) + (S.pitch <= 0.5 ? ' · very deep' : S.pitch <= 0.8 ? ' · deep' : '');
+    $('rate').value = S.rate; $('rateOut').textContent = S.rate.toFixed(2) + '×';
+    $('pause_scale').value = S.pauseScale; $('pauseOut').textContent = S.pauseScale.toFixed(1) + '×';
+    $('volume').value = S.volume; $('volOut').textContent = Math.round(S.volume * 100) + '%';
+    $('maleFirst').checked = !!S.maleFirst;
+    var eng = S.engine, web = eng !== 'device', keys = eng === 'keys';
+    document.querySelectorAll('#engineSeg button').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.engine === S.engine)); });
+    $('deviceVoice').hidden = web;
+    $('cloudVoice').hidden = eng !== 'cloud';
+    $('keysVoice').hidden = !keys;
+    $('tuneBlk').hidden = eng === 'cloud';
+    $('pitchWrap').hidden = web;
+    $('pauseWrap').hidden = web;
+    $('volWrap').hidden = web;
+    $('hear').hidden = web;
+    $('presets').parentNode.hidden = web;
+    $('cloudOut').hidden = !web || !$('cloudOut').childNodes.length;
+    $('enginePill').textContent = keys ? 'Pro voices · your key' : (eng === 'cloud' ? 'Cloud voices · Puter' : 'Device voices · free');
+    $('engineNote').textContent = keys
+      ? 'Uses your own Fish Audio or ElevenLabs account. Your text goes to the service you pick and the audio comes back as files. Their plans decide cost and limits.'
+      : eng === 'cloud'
+        ? 'Sends each section to a cloud voice through Puter and gives you audio files. Provider limits and charges can apply.'
+        : (STANDALONE
+            ? 'Uses the voices built into your phone or browser. Free, private and works offline.'
+            : 'Uses the voices built into your phone or browser. Free, private and works offline. Cloud and Pro voices need the standalone file.');
+    $('cloudTag').textContent = STANDALONE ? 'via Puter' : 'standalone file';
+    $('keysTag').textContent = STANDALONE ? 'Fish · Eleven' : 'standalone file';
+    ui();
+  }
+  function bindSlider(id, key, scale) {
+    $(id).addEventListener('input', function () {
+      S[key] = +$(id).value;
+      if (key === 'pitch' || key === 'rate') S.preset = 'custom';
+      syncControls(); persist(); refreshMeta();
+    });
+  }
+  bindSlider('intensity', 'intensity');
+  bindSlider('pitch', 'pitch');
+  bindSlider('rate', 'rate');
+  bindSlider('pause_scale', 'pauseScale');
+  bindSlider('volume', 'volume');
+
+  $('lang').addEventListener('change', function () { S.lang = $('lang').value; fillVoiceSelect(); persist(); });
+  $('voice').addEventListener('change', function () { S.voiceURI = $('voice').value; persist(); });
+  $('maleFirst').addEventListener('change', function () { S.maleFirst = $('maleFirst').checked; fillVoiceSelect(); persist(); });
+
+  $('engineSeg').addEventListener('click', function (ev) {
+    var b = ev.target.closest('button[data-engine]');
+    if (!b) return;
+    if (b.dataset.engine !== 'device' && !STANDALONE) {
+      $('engineNote').textContent = b.dataset.engine === 'keys'
+        ? 'Fish Audio and ElevenLabs need the standalone file, because this preview page is not allowed to call them.'
+        : 'Cloud voices load from Puter, which this preview page is not allowed to reach. Open the standalone file to use them.';
+      return;
+    }
+    if (state !== 'idle') stop();
+    S.engine = b.dataset.engine;
+    syncControls(); persist();
+  });
+
+  $('script').addEventListener('input', function () { refreshMeta(); persist(); });
+  $('play').addEventListener('click', play);
+  $('pause').addEventListener('click', pauseToggle);
+  $('stop').addEventListener('click', stop);
+  $('hear').addEventListener('click', hear);
+  $('sample').addEventListener('click', function () { if (state !== 'idle') stop(); $('script').value = SAMPLE; refreshMeta(); persist(); setStatus('Sample story loaded.'); });
+  $('clear').addEventListener('click', function () { if (state !== 'idle') stop(); $('script').value = ''; refreshMeta(); persist(); setStatus('Script cleared.'); });
+
+  /* ---------- cloud voices (standalone file only) ---------- */
+  var cGenerated = 0;
+  function moodInstruction() {
+    var t = MOODS[S.mood].text;
+    var p = PRESETS[S.preset];
+    if (p && p.deep) t += ' Use a deep, resonant, low-pitched male narrator register.';
+    if (S.direction.trim()) t += ' ' + S.direction.trim();
+    return t;
+  }
+  function fillCloud() {
+    var pSel = $('cProvider');
+    if (!pSel.options.length) {
+      Object.keys(CLOUD).forEach(function (k) {
+        var o = document.createElement('option'); o.value = k; o.textContent = CLOUD[k].label; pSel.appendChild(o);
+      });
+    }
+    if (!CLOUD[S.cProvider]) S.cProvider = 'openai';
+    pSel.value = S.cProvider;
+    var c = CLOUD[S.cProvider], vSel = $('cVoice');
+    vSel.textContent = '';
+    var ordered = c.star.concat(c.voices.filter(function (v) { return c.star.indexOf(v) < 0; }));
+    ordered.forEach(function (v) {
+      var o = document.createElement('option'); o.value = v;
+      o.textContent = (c.star.indexOf(v) >= 0 ? '★ ' : '') + v; vSel.appendChild(o);
+    });
+    if (ordered.indexOf(S.cVoice) < 0) S.cVoice = ordered[0];
+    vSel.value = S.cVoice;
+    var mSel = $('cModel');
+    mSel.textContent = '';
+    c.models.forEach(function (m) { var o = document.createElement('option'); o.value = m; o.textContent = m; mSel.appendChild(o); });
+    if (c.models.indexOf(S.cModel) < 0) S.cModel = c.models[0];
+    mSel.value = S.cModel;
+    $('cModelField').hidden = c.models.length === 1;
+    $('direction').value = S.direction;
+  }
+  $('cProvider').addEventListener('change', function () {
+    S.cProvider = $('cProvider').value;
+    S.cVoice = CLOUD[S.cProvider].star[0];
+    S.cModel = CLOUD[S.cProvider].models[0];
+    fillCloud(); persist();
+  });
+  $('cVoice').addEventListener('change', function () { S.cVoice = $('cVoice').value; persist(); });
+  $('cModel').addEventListener('change', function () { S.cModel = $('cModel').value; persist(); });
+  $('direction').addEventListener('input', function () { S.direction = $('direction').value; persist(); });
+
+  function splitChunks(text) {
+    var MAX = 2700, out = [], cur = '';
+    function push() { if (cur.trim()) out.push(cur.trim()); cur = ''; }
+    text.trim().split(/\n\s*\n/).forEach(function (par) {
+      par = par.trim();
+      if (!par) return;
+      if (par.length > MAX) {
+        push();
+        (par.match(/[^.!?]+[.!?]+["'”’)\]]*\s*|[^.!?]+$/g) || [par]).forEach(function (s) {
+          s = s.trim();
+          while (s.length > MAX) {
+            var cut = s.lastIndexOf(' ', MAX); if (cut <= 0) cut = MAX;
+            if ((cur + ' ' + s.slice(0, cut)).length > MAX) push();
+            cur = (cur + ' ' + s.slice(0, cut)).trim(); push();
+            s = s.slice(cut).trim();
+          }
+          if ((cur + ' ' + s).length > MAX) push();
+          cur = (cur + ' ' + s).trim();
+        });
+        push();
+        return;
+      }
+      if ((cur + '\n\n' + par).length > MAX) push();
+      cur = cur ? cur + '\n\n' + par : par;
+    });
+    push();
+    return out;
+  }
+  function cloudRequest(text) {
+    var o = { provider: S.cProvider, voice: S.cVoice };
+    if (S.cProvider === 'gemini') { o.model = S.cModel; o.instructions = moodInstruction(); }
+    if (S.cProvider === 'openai') { o.model = S.cModel; if (S.cModel === 'gpt-4o-mini-tts') o.instructions = moodInstruction(); }
+    if (S.cProvider === 'elevenlabs' || S.cProvider === 'speechify') o.model = S.cModel;
+    if (S.cProvider === 'aws-polly') { o.engine = S.cModel; o.language = 'en-US'; }
+    if (S.cProvider === 'xai') {
+      if (S.mood === 'dramatic') text = '[pause] ' + text;
+      if (S.mood === 'sad') text = '<whisper>' + text + '</whisper>';
+      if (S.mood === 'energetic') text = text + ' [laugh]';
+    }
+    return { text: text, options: o };
+  }
+  function addCard(audio, i, n) {
+    var card = document.createElement('div'); card.className = 'audio-card';
+    var t = document.createElement('strong'); t.textContent = 'Section ' + (i + 1) + ' of ' + n; card.appendChild(t);
+    var a = document.createElement('audio'); a.controls = true; a.preload = 'metadata'; a.src = audio.src; card.appendChild(a);
+    var d = document.createElement('a'); d.href = audio.src; d.download = 'voicecraft-section-' + (i + 1) + '.mp3'; d.textContent = 'Download this section';
+    card.appendChild(d);
+    $('cloudOut').appendChild(card);
+  }
+  async function cloudGenerate() {
+    if (!STANDALONE || !window.puter || !window.puter.ai || !window.puter.ai.txt2speech) {
+      setStatus('Puter did not load. Check your connection and refresh the page.');
+      return;
+    }
+    var text = $('script').value.trim();
+    if (!text) { setStatus('Write or paste a script first.'); return; }
+    if (cloudBusy) return;
+    var chunks = splitChunks(text), done = 0;
+    cloudBusy = true; cloudCancel = false;
+    $('cloudOut').textContent = ''; $('cloudOut').hidden = false; $('bar').style.width = '0%';
+    ui();
+    try {
+      for (var i = 0; i < chunks.length; i++) {
+        if (cloudCancel) break;
+        setStatus('Generating section ' + (i + 1) + ' of ' + chunks.length + '…');
+        var r = cloudRequest(chunks[i]);
+        var audio = await window.puter.ai.txt2speech(r.text, r.options);
+        if (!audio || !audio.src) throw new Error('The provider returned no playable audio.');
+        addCard(audio, i, chunks.length);
+        done++;
+        $('bar').style.width = Math.round((done / chunks.length) * 100) + '%';
+      }
+      setStatus(cloudCancel ? 'Stopped. ' + done + ' sections ready.' : 'Done. Play or download your sections below.');
+    } catch (err) {
+      setStatus('Generation stopped: ' + (err && err.message ? err.message : String(err)));
+    } finally {
+      cloudBusy = false; cloudCancel = false; ui();
+    }
+  }
+
+  /* ---------- voice lab ---------- */
+  var labFile = null;
+  var actx = null, labBuf = null, labSrc = null, labNodes = null, labStart = 0, labRaf = 0;
+  function audioCtx() {
+    if (!actx) { var AC = window.AudioContext || window.webkitAudioContext; actx = new AC(); }
+    return actx;
+  }
+  function labStatus(msg) { $('labStatus').textContent = msg; }
+  function labValues() {
+    return { depth: +$('depth').value, warmth: +$('warmth').value, room: +$('room').value };
+  }
+  function labLabels() {
+    var v = labValues();
+    $('depthOut').textContent = v.depth.toFixed(1) + ' semitones';
+    $('warmthOut').textContent = '+' + v.warmth.toFixed(1) + ' dB';
+    $('roomOut').textContent = v.room + '%';
+    if (labBuf) {
+      var rate = Math.pow(2, v.depth / 12);
+      var d = labBuf.duration / rate;
+      $('labInfo').textContent = fmt(labBuf.duration) + ' original · ' + fmt(d) + ' processed';
+    }
+  }
+  function fmt(s) { s = Math.round(s); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
+
+  function drawWave() {
+    var cv = $('canvas'), wrap = $('wave');
+    var w = wrap.clientWidth, h = wrap.clientHeight;
+    if (!w || !h) return;
+    var dpr = window.devicePixelRatio || 1;
+    cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+    var c = cv.getContext('2d');
+    c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    c.clearRect(0, 0, w, h);
+    $('waveEmpty').hidden = !!labBuf;
+    if (!labBuf) return;
+    var css = getComputedStyle(document.documentElement);
+    var color = css.getPropertyValue('--accent').trim() || '#e2b155';
+    var data = labBuf.getChannelData(0), step = Math.max(1, Math.floor(data.length / w));
+    c.fillStyle = color;
+    for (var x = 0; x < w; x++) {
+      var min = 1, max = -1, base = x * step;
+      for (var j = 0; j < step; j += Math.max(1, Math.floor(step / 40))) {
+        var d = data[base + j]; if (d === undefined) break;
+        if (d < min) min = d; if (d > max) max = d;
+      }
+      if (min > max) continue;
+      var y1 = (1 - max) * 0.5 * h, y2 = (1 - min) * 0.5 * h;
+      c.fillRect(x, y1, 1, Math.max(1, y2 - y1));
+    }
+  }
+  window.addEventListener('resize', drawWave);
+  if (window.matchMedia) {
+    var mq = window.matchMedia('(prefers-color-scheme: dark)');
+    if (mq.addEventListener) mq.addEventListener('change', function () { setTimeout(drawWave, 50); });
+  }
+
+  async function loadFile(f) {
+    labStop();
+    labStatus('Reading ' + f.name + '…');
+    try {
+      var ab = await f.arrayBuffer();
+      var buf = await audioCtx().decodeAudioData(ab);
+      labBuf = buf;
+      labFile = f;
+      $('rvGo').disabled = !STANDALONE;
+      $('cloneGo').disabled = !STANDALONE;
+      $('dropTitle').textContent = f.name;
+      $('dropSub').textContent = fmt(buf.duration) + ' · tap to choose another';
+      $('labPlay').disabled = false;
+      labLabels(); drawWave();
+      labStatus('Loaded. Press Play and move the sliders while it runs.');
+    } catch (err) {
+      labBuf = null;
+      labFile = f;
+      $('labPlay').disabled = true;
+      $('rvGo').disabled = !STANDALONE;
+      $('cloneGo').disabled = !STANDALONE;
+      drawWave();
+      labStatus('This browser could not decode the file, so the effects are unavailable. Cloning and Re-voice can still try it.');
+    }
+  }
+  $('file').addEventListener('change', function () { var f = $('file').files[0]; if (f) loadFile(f); });
+  ['dragenter', 'dragover'].forEach(function (n) {
+    $('drop').addEventListener(n, function (e) { e.preventDefault(); $('drop').classList.add('over'); });
+  });
+  ['dragleave', 'drop'].forEach(function (n) {
+    $('drop').addEventListener(n, function (e) { e.preventDefault(); $('drop').classList.remove('over'); });
+  });
+  $('drop').addEventListener('drop', function (e) {
+    var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if (f) loadFile(f);
+  });
+
+  function impulse(c, secs, decay) {
+    var len = Math.floor(c.sampleRate * secs), b = c.createBuffer(2, len, c.sampleRate);
+    for (var ch = 0; ch < 2; ch++) {
+      var d = b.getChannelData(ch);
+      for (var i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, decay);
+    }
+    return b;
+  }
+  function applyLab() {
+    if (!labNodes) return;
+    var v = labValues(), t = actx.currentTime;
+    labSrc.playbackRate.setTargetAtTime(Math.pow(2, v.depth / 12), t, 0.02);
+    labNodes.low.gain.setTargetAtTime(v.warmth, t, 0.02);
+    labNodes.wet.gain.setTargetAtTime(v.room / 100, t, 0.02);
+    labNodes.dry.gain.setTargetAtTime(1 - (v.room / 100) * 0.5, t, 0.02);
+  }
+  function labTick() {
+    if (!labSrc) return;
+    var rate = labSrc.playbackRate.value;
+    var pos = (actx.currentTime - labStart) * rate / labBuf.duration;
+    $('played').style.width = clamp(pos * 100, 0, 100) + '%';
+    labRaf = requestAnimationFrame(labTick);
+  }
+  async function labPlay() {
+    if (!labBuf) return;
+    labStop();
+    var c = audioCtx();
+    try { await c.resume(); } catch (e) { /* resume refused */ }
+    var src = c.createBufferSource(); src.buffer = labBuf;
+    var low = c.createBiquadFilter(); low.type = 'lowshelf'; low.frequency.value = 180;
+    var comp = c.createDynamicsCompressor(); comp.threshold.value = -24; comp.ratio.value = 3;
+    var dry = c.createGain(), wet = c.createGain(), master = c.createGain(); master.gain.value = 0.9;
+    var conv = c.createConvolver(); conv.buffer = impulse(c, 1.8, 3);
+    src.connect(low); low.connect(comp);
+    comp.connect(dry); dry.connect(master);
+    comp.connect(conv); conv.connect(wet); wet.connect(master);
+    master.connect(c.destination);
+    labSrc = src; labNodes = { low: low, wet: wet, dry: dry };
+    var v = labValues();
+    src.playbackRate.value = Math.pow(2, v.depth / 12);
+    low.gain.value = v.warmth; wet.gain.value = v.room / 100; dry.gain.value = 1 - (v.room / 100) * 0.5;
+    src.onended = function () { if (labSrc === src) { labSrc = null; labNodes = null; cancelAnimationFrame(labRaf); $('played').style.width = '0'; $('labPlay').disabled = false; $('labStop').disabled = true; labStatus('Finished.'); } };
+    labStart = c.currentTime;
+    src.start();
+    $('labPlay').disabled = true; $('labStop').disabled = false;
+    labStatus('Playing. Adjust the sliders while it runs.');
+    labTick();
+  }
+  function labStop() {
+    if (labSrc) {
+      var s = labSrc; labSrc = null; labNodes = null;
+      try { s.onended = null; s.stop(); } catch (e) { /* already stopped */ }
+    }
+    cancelAnimationFrame(labRaf);
+    $('played').style.width = '0';
+    $('labStop').disabled = true;
+    if (labBuf) $('labPlay').disabled = false;
+  }
+  $('labPlay').addEventListener('click', labPlay);
+  $('labStop').addEventListener('click', function () { labStop(); labStatus('Stopped.'); });
+  ['depth', 'warmth', 'room'].forEach(function (id) {
+    $(id).addEventListener('input', function () {
+      document.querySelectorAll('#labPresets .chip').forEach(function (b) { b.setAttribute('aria-pressed', 'false'); });
+      labLabels(); applyLab();
+    });
+  });
+  $('labPresets').addEventListener('click', function (e) {
+    var b = e.target.closest('.chip'); if (!b) return;
+    var p = b.dataset.p.split(',').map(Number);
+    $('depth').value = p[0]; $('warmth').value = p[1]; $('room').value = p[2];
+    document.querySelectorAll('#labPresets .chip').forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); });
+    labLabels(); applyLab();
+  });
+
+  /* ---------- re-voice (standalone file only) ---------- */
+  var RV_FALLBACK = [
+    { id: 'pNInz6obpgDQGcFmaJgB', name: 'Adam' },
+    { id: 'TxGEqnHWrfWFTfGW9XjX', name: 'Josh' },
+    { id: 'VR6AewLTigWG4xSOukaG', name: 'Arnold' },
+    { id: 'ErXwobaYiN019PkySvjV', name: 'Antoni' },
+    { id: '21m00Tcm4TlvDq8ikWAM', name: 'Rachel' }
+  ];
+  var RV_STAR = /^(adam|josh|arnold|antoni)\b/i;
+  function rvStatus(m) { $('rvStatus').textContent = m; }
+  async function rvLoadVoices() {
+    var list = RV_FALLBACK;
+    try {
+      var tts = window.puter && window.puter.ai && window.puter.ai.txt2speech;
+      var fn = (tts && tts.listVoices) || (window.puter && window.puter.ai && window.puter.ai.listVoices);
+      if (fn) {
+        var r = await fn.call(tts || window.puter.ai, { provider: 'elevenlabs' });
+        var arr = Array.isArray(r) ? r : ((r && (r.voices || r.data)) || []);
+        var norm = arr.map(function (o) {
+          if (typeof o === 'string') return { id: o, name: o };
+          var id = o.voice_id || o.voiceId || o.id || o.name;
+          return { id: id, name: o.name || id };
+        }).filter(function (o) { return o.id; });
+        if (norm.length) list = norm;
+      }
+    } catch (e) { /* keep the built-in list */ }
+    list = list.slice().sort(function (a, b) {
+      var sa = RV_STAR.test(a.name), sb = RV_STAR.test(b.name);
+      if (sa !== sb) return sa ? -1 : 1;
+      return a.name.localeCompare(b.name);
+    });
+    var sel = $('rvVoice');
+    sel.textContent = '';
+    list.forEach(function (v) {
+      var o = document.createElement('option');
+      o.value = v.id; o.textContent = (RV_STAR.test(v.name) ? '★ ' : '') + v.name;
+      sel.appendChild(o);
+    });
+    sel.disabled = false;
+    $('rvCount').textContent = list.length + ' voices';
+  }
+  async function rvConvert() {
+    if (!STANDALONE || !window.puter || !window.puter.ai || !window.puter.ai.speech2speech) {
+      rvStatus('Puter did not load. Check your connection and refresh the page.');
+      return;
+    }
+    if (!labFile) { rvStatus('Load a recording above first.'); return; }
+    $('rvGo').disabled = true;
+    $('rvOut').textContent = '';
+    rvStatus('Converting. Puter may ask you to sign in.');
+    try {
+      var audio = await window.puter.ai.speech2speech({ audio: labFile, voice: $('rvVoice').value });
+      if (!audio || !audio.src) throw new Error('No audio was returned.');
+      var card = document.createElement('div'); card.className = 'audio-card';
+      var t = document.createElement('strong'); t.textContent = 'Converted recording'; card.appendChild(t);
+      var a = document.createElement('audio'); a.controls = true; a.src = audio.src; card.appendChild(a);
+      var d = document.createElement('a'); d.href = audio.src; d.download = 'voicecraft-revoiced.mp3'; d.textContent = 'Download';
+      card.appendChild(d);
+      $('rvOut').appendChild(card);
+      rvStatus('Done.');
+    } catch (err) {
+      var msg = err && err.message ? err.message : (typeof err === 'string' ? err : 'unknown error');
+      rvStatus('Conversion failed: ' + msg);
+    } finally {
+      $('rvGo').disabled = false;
+    }
+  }
+  $('rvGo').addEventListener('click', rvConvert);
+  if (STANDALONE) {
+    rvLoadVoices();
+  } else {
+    $('revoiceNote').textContent = 'Converts a recording into a different cloud voice. This needs the standalone file, because this preview page cannot reach the cloud voice service.';
+    $('cloneNote').textContent = 'Cloning uploads your recording to Fish Audio or ElevenLabs. This needs the standalone file, because this preview page is not allowed to call them.';
+  }
+
+  /* ---------- Pro keys: Fish Audio and ElevenLabs (standalone file only) ---------- */
+  var FISH_MODELS = [['s2.1-pro-free', 'S2.1 Pro, free tier'], ['s2.1-pro', 'S2.1 Pro'], ['drama-3', 'Drama 3, top ranked'], ['s2-pro', 'S2 Pro']];
+  var EL_MODELS = [['eleven_multilingual_v2', 'Multilingual v2'], ['eleven_v4', 'v4, top ranked'], ['eleven_v4_turbo', 'v4 Turbo'], ['eleven_v3', 'v3'], ['eleven_flash_v2_5', 'Flash v2.5, fastest']];
+  var FISH_MOOD = { dramatic: 'dramatic', emotional: 'warm and emotional', sad: 'sad', hopeful: 'hopeful', calm: 'calm', energetic: 'excited', neutral: '' };
+  var EL_STYLE = { dramatic: 0.6, emotional: 0.5, sad: 0.4, hopeful: 0.4, calm: 0.1, energetic: 0.6, neutral: 0 };
+  var LSK = 'voicecraft.keys';
+  var KEYS = { fish: '', eleven: '' };
+  try {
+    var savedKeys = JSON.parse(localStorage.getItem(LSK) || 'null');
+    if (savedKeys) { KEYS.fish = savedKeys.fish || ''; KEYS.eleven = savedKeys.eleven || ''; S.rememberKeys = true; }
+  } catch (e) { /* storage unavailable */ }
+  var kLists = { fish: { mine: [], library: [] }, eleven: { mine: [], library: [] } };
+  var kAbort = null, kUrls = [];
+
+  function ksvc() { return S.kService === 'eleven' ? 'eleven' : 'fish'; }
+  function svcName(k) { return k === 'fish' ? 'Fish Audio' : 'ElevenLabs'; }
+  function kStatus(m) { $('kNote').textContent = m; }
+  function saveKeys() {
+    try {
+      if (S.rememberKeys) localStorage.setItem(LSK, JSON.stringify(KEYS));
+      else localStorage.removeItem(LSK);
+    } catch (e) { /* storage unavailable */ }
+  }
+
+  async function apiFetch(url, opts, who) {
+    var r;
+    try { r = await fetch(url, opts); }
+    catch (e) {
+      if (e && e.name === 'AbortError') throw e;
+      throw new Error('Could not reach ' + who + '. Check your connection and key. If it keeps failing, the service may not allow web pages to call it directly.');
+    }
+    if (!r.ok) {
+      var t = '';
+      try { t = await r.text(); } catch (e2) { /* no body */ }
+      var m = t;
+      try {
+        var j = JSON.parse(t), d = j.detail;
+        m = (d && (d.message || (typeof d === 'string' ? d : ''))) || j.message || t;
+      } catch (e3) { /* not JSON */ }
+      if (r.status === 401) m = 'The key was rejected. Check that you pasted the whole key.';
+      else if (r.status === 402) m = 'Your account has no credit left for this request.';
+      throw new Error('HTTP ' + r.status + (m ? ': ' + String(m).slice(0, 200) : ''));
+    }
+    return r;
+  }
+
+  function addOption(sel, value, label) {
+    var o = document.createElement('option');
+    o.value = value; o.textContent = label;
+    sel.appendChild(o);
+  }
+  function renderKVoices() {
+    var svc = ksvc(), sel = $('kVoice'), list = kLists[svc][S.kScope === 'library' ? 'library' : 'mine'];
+    sel.textContent = '';
+    if (!list.length) addOption(sel, '', svc === 'fish' && S.kScope === 'mine' ? 'Default voice (or press Load voices)' : 'Press Load voices');
+    list.forEach(function (v) { addOption(sel, v.id, (v.male ? '♂ ' : '') + v.name + (v.note ? ' · ' + v.note : '')); });
+    var want = S['kv_' + svc];
+    if (want && list.some(function (v) { return v.id === want; })) sel.value = want;
+    else if (list.length) { sel.value = list[0].id; S['kv_' + svc] = list[0].id; }
+    $('kCount').textContent = list.length ? list.length + (list.length === 1 ? ' voice' : ' voices') : '';
+  }
+  function fillKeys() {
+    var svc = ksvc(), sSel = $('kService'), cSel = $('cloneService');
+    if (!sSel.options.length) {
+      [['fish', 'Fish Audio'], ['eleven', 'ElevenLabs']].forEach(function (p) { addOption(sSel, p[0], p[1]); addOption(cSel, p[0], p[1]); });
+    }
+    sSel.value = svc;
+    $('keyIn').value = KEYS[svc];
+    $('rememberKeys').checked = !!S.rememberKeys;
+    var mSel = $('kModel'), models = svc === 'fish' ? FISH_MODELS : EL_MODELS;
+    mSel.textContent = '';
+    models.forEach(function (m) { addOption(mSel, m[0], m[1]); });
+    mSel.value = S['kmod_' + svc] || models[0][0];
+    $('kScope').value = S.kScope === 'library' ? 'library' : 'mine';
+    $('kVoiceManual').value = S['km_' + svc] || '';
+    $('kSearch').placeholder = 'Search, e.g. deep male narrator';
+    renderKVoices();
+    $('cloneKey').value = KEYS[cSel.value || 'fish'] || '';
+    var drama = svc === 'fish' && mSel.value === 'drama-3';
+    $('kNote').textContent = svc === 'fish'
+      ? (drama ? 'Drama 3 takes its own directions, so mood tags are not added. ' : 'Your mood is added as a tag such as [sad] at the start of each paragraph. ') + 'The S2.1 Pro free tier is listed as free for developers through November 30, 2026. With no voice chosen, Fish Audio uses its default voice.'
+      : 'Mood changes stability and style. Library voices may need adding to your account on the ElevenLabs site before they work. The newest models may not be on every plan.';
+  }
+  function kCurrentVoice() {
+    var svc = ksvc();
+    return ($('kVoiceManual').value.trim()) || $('kVoice').value || '';
+  }
+
+  async function kLoadVoices() {
+    var svc = ksvc(), key = (KEYS[svc] || '').trim();
+    if (!STANDALONE) { kStatus('Pro voices need the standalone file.'); return; }
+    if (!key) { kStatus('Paste your ' + svcName(svc) + ' key first.'); return; }
+    var q = $('kSearch').value.trim(), lib = S.kScope === 'library', enc = encodeURIComponent, list = [], url;
+    $('kLoad').disabled = true;
+    kStatus('Loading voices…');
+    try {
+      if (svc === 'eleven') {
+        url = lib
+          ? 'https://api.elevenlabs.io/v1/shared-voices?page_size=30&sort=trending' + (q ? '&search=' + enc(q) : '')
+          : 'https://api.elevenlabs.io/v2/voices?page_size=100' + (q ? '&search=' + enc(q) : '');
+        var j = await (await apiFetch(url, { headers: { 'xi-api-key': key } }, 'ElevenLabs')).json();
+        list = (j.voices || []).map(function (v) {
+          var lab = v.labels || {}, g = String(v.gender || lab.gender || '').toLowerCase(), a = v.accent || lab.accent || '';
+          return { id: v.voice_id, name: v.name, note: [g, a].filter(Boolean).join(', '), male: g === 'male' };
+        });
+        list.sort(function (a, b) { return (a.male === b.male) ? 0 : (a.male ? -1 : 1); });
+      } else {
+        url = 'https://api.fish.audio/model?page_size=' + (lib ? 30 : 50) + (lib ? '&sort_by=score' : '&self=true&sort_by=created_at') + (q ? '&title=' + enc(q) : '');
+        var jf = await (await apiFetch(url, { headers: { 'Authorization': 'Bearer ' + key } }, 'Fish Audio')).json();
+        list = (jf.items || []).filter(function (m) { return m.type !== 'svc'; }).map(function (m) {
+          return { id: m._id, name: m.title, note: (m.languages || []).slice(0, 2).join(', ') };
+        });
+      }
+      kLists[svc][lib ? 'library' : 'mine'] = list;
+      renderKVoices(); persist();
+      kStatus(list.length ? 'Loaded ' + list.length + ' voices. Pick one, then press Generate.' : 'No voices found. Try another search, or paste a voice ID.');
+    } catch (err) {
+      kStatus('Could not load voices: ' + (err && err.message ? err.message : String(err)));
+    } finally {
+      $('kLoad').disabled = false;
+    }
+  }
+
+  function fishText(text, model) {
+    if (model === 'drama-3') return text;
+    var w = FISH_MOOD[S.mood];
+    if (!w) return text;
+    if (w.indexOf(' ') < 0) { if (S.intensity < 40) w = 'slightly ' + w; else if (S.intensity >= 85) w = 'very ' + w; }
+    var tag = '[' + w + ']';
+    return text.split(/\n\s*\n/).map(function (p) { return tag + ' ' + p; }).join('\n\n');
+  }
+  function kRequest(svc, key, voice, text) {
+    var i = S.intensity / 100;
+    if (svc === 'fish') {
+      var model = S.kmod_fish || 's2.1-pro-free';
+      var body = { text: fishText(text, model), format: 'mp3', temperature: clamp(0.5 + 0.35 * i, 0.3, 0.9), prosody: { speed: clamp(S.rate, 0.5, 2) } };
+      if (voice) body.reference_id = voice;
+      return { url: 'https://api.fish.audio/v1/tts', opts: { method: 'POST', headers: { 'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json', 'model': model }, body: JSON.stringify(body) } };
+    }
+    var em = S.kmod_eleven || 'eleven_multilingual_v2';
+    var stab = clamp(0.8 - 0.6 * i, 0.2, 0.8);
+    if (/_v3|_v4/.test(em)) stab = stab < 0.25 ? 0 : (stab < 0.75 ? 0.5 : 1);
+    return {
+      url: 'https://api.elevenlabs.io/v1/text-to-speech/' + encodeURIComponent(voice) + '?output_format=mp3_44100_128',
+      opts: {
+        method: 'POST',
+        headers: { 'xi-api-key': key, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: text, model_id: em, voice_settings: { stability: stab, similarity_boost: 0.75, style: clamp((EL_STYLE[S.mood] || 0) * i, 0, 1), use_speaker_boost: true, speed: clamp(S.rate, 0.7, 1.2) } })
+      }
+    };
+  }
+
+  async function keysGenerate() {
+    if (!STANDALONE) { setStatus('Pro voices need the standalone file.'); return; }
+    var svc = ksvc(), key = (KEYS[svc] || '').trim(), text = $('script').value.trim();
+    if (!text) { setStatus('Write or paste a script first.'); return; }
+    if (!key) { setStatus('Paste your ' + svcName(svc) + ' key first.'); return; }
+    var voice = kCurrentVoice();
+    if (svc === 'eleven' && !voice) { setStatus('Choose a voice first. Press Load voices, or paste a voice ID.'); return; }
+    if (cloudBusy) return;
+    var chunks = splitChunks(text), done = 0;
+    kUrls.forEach(function (u) { URL.revokeObjectURL(u); });
+    kUrls = [];
+    cloudBusy = true; cloudCancel = false; kAbort = new AbortController();
+    $('cloudOut').textContent = ''; $('cloudOut').hidden = false; $('bar').style.width = '0%';
+    ui();
+    try {
+      for (var i = 0; i < chunks.length; i++) {
+        if (cloudCancel) break;
+        setStatus('Generating section ' + (i + 1) + ' of ' + chunks.length + ' with ' + svcName(svc) + '…');
+        var r = kRequest(svc, key, voice, chunks[i]);
+        r.opts.signal = kAbort.signal;
+        var resp = await apiFetch(r.url, r.opts, svcName(svc));
+        var blob = await resp.blob();
+        if (!blob.size) throw new Error('The service returned empty audio.');
+        var u = URL.createObjectURL(blob);
+        kUrls.push(u);
+        addCard({ src: u }, i, chunks.length);
+        done++;
+        $('bar').style.width = Math.round((done / chunks.length) * 100) + '%';
+      }
+      setStatus(cloudCancel ? 'Stopped. ' + done + ' sections ready.' : 'Done. Play or download your sections below.');
+    } catch (err) {
+      if (err && err.name === 'AbortError') setStatus('Stopped. ' + done + ' sections ready.');
+      else setStatus('Generation stopped: ' + (err && err.message ? err.message : String(err)));
+    } finally {
+      cloudBusy = false; cloudCancel = false; kAbort = null; ui();
+    }
+  }
+
+  function cloneStatus(m) { $('cloneStatus').textContent = m; }
+  async function cloneVoice() {
+    if (!STANDALONE) { cloneStatus('Cloning needs the standalone file.'); return; }
+    var svc = $('cloneService').value, key = (KEYS[svc] || '').trim();
+    if (!labFile) { cloneStatus('Load a recording above first.'); return; }
+    if (!$('cloneConsent').checked) { cloneStatus('Confirm that the voice is yours or that you have permission.'); return; }
+    if (!key) { cloneStatus('Paste your ' + svcName(svc) + ' key first.'); return; }
+    var name = $('cloneName').value.trim() || 'My voice';
+    $('cloneGo').disabled = true;
+    cloneStatus('Uploading ' + labFile.name + ' to ' + svcName(svc) + '…');
+    try {
+      var fd = new FormData(), id, extra = '';
+      if (svc === 'fish') {
+        fd.append('type', 'tts'); fd.append('title', name); fd.append('train_mode', 'fast');
+        fd.append('visibility', 'private'); fd.append('enhance_audio_quality', 'true');
+        fd.append('voices', labFile, labFile.name);
+        var r = await apiFetch('https://api.fish.audio/model', { method: 'POST', headers: { 'Authorization': 'Bearer ' + key }, body: fd }, 'Fish Audio');
+        var j = await r.json();
+        id = j._id || j.id;
+      } else {
+        fd.append('name', name); fd.append('files[]', labFile, labFile.name);
+        var r2 = await apiFetch('https://api.elevenlabs.io/v1/voices/add', { method: 'POST', headers: { 'xi-api-key': key }, body: fd }, 'ElevenLabs');
+        var j2 = await r2.json();
+        id = j2.voice_id;
+        if (j2.requires_verification) extra = ' ElevenLabs says this voice needs verification first.';
+      }
+      if (!id) throw new Error('The service did not return a voice ID.');
+      kLists[svc].mine = [{ id: id, name: name, note: 'your clone' }].concat(kLists[svc].mine.filter(function (v) { return v.id !== id; }));
+      S.kService = svc; S['kv_' + svc] = id; S['km_' + svc] = ''; S.kScope = 'mine'; S.engine = 'keys';
+      persist(); fillKeys(); syncControls();
+      cloneStatus('Created "' + name + '". It is selected under Pro keys in Narrate.' + extra);
+    } catch (err) {
+      cloneStatus('Cloning failed: ' + (err && err.message ? err.message : String(err)));
+    } finally {
+      $('cloneGo').disabled = !labFile;
+    }
+  }
+
+  $('kService').addEventListener('change', function () { S.kService = $('kService').value; fillKeys(); persist(); });
+  $('keyIn').addEventListener('input', function () {
+    var svc = ksvc(); KEYS[svc] = $('keyIn').value; saveKeys();
+    if ($('cloneService').value === svc) $('cloneKey').value = KEYS[svc];
+  });
+  $('rememberKeys').addEventListener('change', function () { S.rememberKeys = $('rememberKeys').checked; saveKeys(); persist(); });
+  $('kModel').addEventListener('change', function () { S['kmod_' + ksvc()] = $('kModel').value; fillKeys(); persist(); });
+  $('kScope').addEventListener('change', function () { S.kScope = $('kScope').value; renderKVoices(); persist(); });
+  $('kVoice').addEventListener('change', function () { S['kv_' + ksvc()] = $('kVoice').value; persist(); });
+  $('kVoiceManual').addEventListener('input', function () { S['km_' + ksvc()] = $('kVoiceManual').value; persist(); });
+  $('kLoad').addEventListener('click', kLoadVoices);
+  $('kSearch').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); kLoadVoices(); } });
+  $('cloneService').addEventListener('change', function () { $('cloneKey').value = KEYS[$('cloneService').value] || ''; });
+  $('cloneKey').addEventListener('input', function () {
+    var svc = $('cloneService').value; KEYS[svc] = $('cloneKey').value; saveKeys();
+    if (ksvc() === svc) $('keyIn').value = KEYS[svc];
+  });
+  $('cloneGo').addEventListener('click', cloneVoice);
+
+  /* ---------- init ---------- */
+  $('script').value = typeof stored.script === 'string' && stored.script ? stored.script : SAMPLE;
+  renderPresets();
+  $('previewBanner').hidden = STANDALONE;
+  renderMoods();
+  fillCloud();
+  fillKeys();
+  syncControls();
+  refreshMeta();
+  labLabels();
+  setStatus(synth ? 'Ready. Press Speak to hear the sample story.' : 'This browser has no speech engine. Try Chrome, Edge or Safari.');
+  if (synth) {
+    loadVoices();
+    if ('onvoiceschanged' in synth) synth.onvoiceschanged = loadVoices;
+    setTimeout(loadVoices, 600);
+    setTimeout(loadVoices, 1800);
+  }
+  showView(location.hash.slice(1));
+  window.addEventListener('pagehide', function () { if (synth) synth.cancel(); });
+})();
+</script>
+
+</body>
+</html>
