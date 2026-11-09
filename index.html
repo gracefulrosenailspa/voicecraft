@@ -1473,7 +1473,7 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
     box.textContent = '';
     box.hidden = !!(KEYS[svc] || '').trim();
     if (box.hidden) return;
-    var url = svc === 'fish' ? 'https://fish.audio/en/developers/' : 'https://elevenlabs.io/app/settings/api-keys';
+    var url = svc === 'fish' ? 'https://fish.audio/app/developers/get-started/' : 'https://elevenlabs.io/app/settings/api-keys';
     box.appendChild(document.createTextNode('Nothing happens until you add your own ' + svcName(svc) + ' API key. Create a free account, copy a key, and paste it below. '));
     var a = document.createElement('a');
     a.href = url; a.target = '_blank'; a.rel = 'noopener'; a.textContent = 'Open ' + svcName(svc);
