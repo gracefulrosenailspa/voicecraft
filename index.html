@@ -243,6 +243,8 @@ input[type="range"] { width: 100%; accent-color: var(--accent); min-height: 28px
 .callout { border-left: 3px solid var(--accent); padding: 4px 0 4px 14px; color: var(--muted); font-size: 13.5px; }
 .callout b { color: var(--fg); }
 
+#keysVoice, #cloudVoice { scroll-margin-top: 84px; }
+#kHelp a { color: var(--accent); font-weight: 600; }
 .banner { margin-top: 16px; padding: 12px 16px; border: 1px solid var(--accent); border-radius: 12px; background: var(--surface); font-size: 13.5px; color: var(--fg); }
 .banner b { color: var(--accent); }
 
@@ -354,6 +356,7 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
 
         <section class="blk" id="keysVoice" hidden>
           <h3>Pro voice</h3>
+          <p class="note" id="kHelp"></p>
           <div class="field"><label for="kService">Service</label><select id="kService"></select></div>
           <div class="field"><label for="keyIn">API key</label><input type="password" id="keyIn" autocomplete="off" spellcheck="false" placeholder="Paste your key"></div>
           <label class="check" for="rememberKeys"><input type="checkbox" id="rememberKeys"> Remember keys on this device</label>
@@ -982,6 +985,8 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
     if (state !== 'idle') stop();
     S.engine = b.dataset.engine;
     syncControls(); persist();
+    var target = S.engine === 'keys' ? $('keysVoice') : (S.engine === 'cloud' ? $('cloudVoice') : null);
+    if (target) target.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'start' });
   });
 
   $('script').addEventListener('input', function () { refreshMeta(); persist(); });
@@ -1457,10 +1462,22 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
     $('kSearch').placeholder = 'Search, e.g. deep male narrator';
     renderKVoices();
     $('cloneKey').value = KEYS[cSel.value || 'fish'] || '';
+    updateKHelp();
     var drama = svc === 'fish' && mSel.value === 'drama-3';
     $('kNote').textContent = svc === 'fish'
       ? (drama ? 'Drama 3 takes its own directions, so mood tags are not added. ' : 'Your mood is added as a tag such as [sad] at the start of each paragraph. ') + 'The S2.1 Pro free tier is listed as free for developers through November 30, 2026. With no voice chosen, Fish Audio uses its default voice.'
       : 'Mood changes stability and style. Library voices may need adding to your account on the ElevenLabs site before they work. The newest models may not be on every plan.';
+  }
+  function updateKHelp() {
+    var svc = ksvc(), box = $('kHelp');
+    box.textContent = '';
+    box.hidden = !!(KEYS[svc] || '').trim();
+    if (box.hidden) return;
+    var url = svc === 'fish' ? 'https://fish.audio/en/developers/' : 'https://elevenlabs.io/app/settings/api-keys';
+    box.appendChild(document.createTextNode('Nothing happens until you add your own ' + svcName(svc) + ' API key. Create a free account, copy a key, and paste it below. '));
+    var a = document.createElement('a');
+    a.href = url; a.target = '_blank'; a.rel = 'noopener'; a.textContent = 'Open ' + svcName(svc);
+    box.appendChild(a);
   }
   function kCurrentVoice() {
     var svc = ksvc();
@@ -1611,6 +1628,7 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
   $('keyIn').addEventListener('input', function () {
     var svc = ksvc(); KEYS[svc] = $('keyIn').value; saveKeys();
     if ($('cloneService').value === svc) $('cloneKey').value = KEYS[svc];
+    updateKHelp();
   });
   $('rememberKeys').addEventListener('change', function () { S.rememberKeys = $('rememberKeys').checked; saveKeys(); persist(); });
   $('kModel').addEventListener('change', function () { S['kmod_' + ksvc()] = $('kModel').value; fillKeys(); persist(); });
