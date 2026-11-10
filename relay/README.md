@@ -1,17 +1,15 @@
-# VoiceCraft Fish Audio relay setup
+# VoiceCraft Cloudflare relay setup
 
-The relay in `relay/worker.js` is intentionally fail-closed. It returns HTTP 503 until a Cloudflare Rate Limiting binding named `RATE_LIMITER` is configured. Do not remove that check to make the relay appear to work: an unrestricted relay can be abused.
+The shared relay in `relay/worker.js` supports Fish Audio and ElevenLabs. It is fail-closed and returns HTTP 503 until a Cloudflare Rate Limiting binding named `RATE_LIMITER` is configured.
 
 ## Configure the required Cloudflare binding
 
-Cloudflare's Workers Rate Limiting API is configured through the Worker's Wrangler configuration. It is not a normal dashboard-only variable.
-
-Add this to the existing `wrangler.toml` for the Worker that runs `relay/worker.js`:
+Add this to the existing Worker's `wrangler.toml`:
 
 ```toml
 [[ratelimits]]
 name = "RATE_LIMITER"
-# Replace this with a positive integer unique to your Cloudflare account.
+# Replace with a positive integer unique to your Cloudflare account.
 namespace_id = "REPLACE_WITH_YOUR_OWN_UNIQUE_INTEGER"
 
   [ratelimits.simple]
@@ -19,33 +17,30 @@ namespace_id = "REPLACE_WITH_YOUR_OWN_UNIQUE_INTEGER"
   period = 60
 ```
 
-Do not deploy until you replace the placeholder with a unique numeric namespace ID for your Cloudflare account. Keep any existing Worker name, entry-point, compatibility date, and other settings in your current Wrangler configuration. The `main` entry must point to `relay/worker.js` (or to the actual path you use for this Worker).
+Keep the existing Worker name, compatibility date and other settings. The entry point must be `relay/worker.js`. Do not create a second Worker if one already exists. Replace the placeholder namespace ID before deployment.
 
-Then deploy the Worker using Wrangler from the directory containing that configuration. If you do not currently use Wrangler to deploy this Worker, stop and check the current deployment method before changing it. Do not create a second Worker by accident.
+## Configure VoiceCraft
 
-Cloudflare's Worker Rate Limiting API is approximate and enforced separately in each Cloudflare location. Requests may exceed the configured threshold briefly. It is useful abuse protection, not a strict global quota. For strict global limits, Cloudflare recommends a Durable Object-based limiter. See the [Cloudflare Rate Limiting documentation](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/).
+Deploy the Worker, then paste its base URL into VoiceCraft's **Cloudflare relay address** field. Use the same address for both providers. The frontend routes ElevenLabs requests through the `/elevenlabs` prefix.
 
-## What the relay enforces
+Allowed browser origins:
+- `https://gracefulrosenailspa.github.io`
+- `https://voicecraft-preview-kpp1gw.v2.appdeploy.ai`
 
-- Only the configured VoiceCraft GitHub Pages origin is allowed by the browser CORS policy.
-- Only `GET /model`, `GET /model/*`, `POST /model` for voice cloning, and `POST /v1/tts` are accepted.
-- A Fish Audio bearer token is required.
-- The bearer token is SHA-256 hashed before being used as the rate-limit key. The raw token is not logged or stored by this Worker.
-- Text-to-speech request bodies are limited to 1 MiB. Fish Audio voice-cloning uploads to `POST /model` are limited to 25 MiB. Both limits are enforced while streaming, even when Content-Length is missing or inaccurate.
-- Requests are not cached.
-- Missing or unavailable rate limiting fails closed with HTTP 503.
+If the website moves, add its exact origin to `ALLOWED_ORIGINS` and review CORS.
 
-**Important:** an Origin header is not authentication. Non-browser clients can forge it. The rate-limit binding is therefore required, not optional. The relay forwards the user's own Fish Audio bearer token; it does not provide a shared VoiceCraft API key.
+## Routes and protections
+
+- Fish Audio: `GET /model`, `GET /model/*`, `POST /model` for cloning, `POST /v1/tts`.
+- ElevenLabs: `GET /elevenlabs/v2/voices`, `GET /elevenlabs/v1/shared-voices`, `POST /elevenlabs/v1/text-to-speech/{voice_id}`, `POST /elevenlabs/v1/voices/add`.
+- Every request requires the user's own provider key.
+- The key is forwarded to the chosen provider but not logged or stored by this Worker. A SHA-256 digest of provider plus key is used for rate limiting.
+- TTS bodies are limited to 1 MiB; voice-cloning uploads to 25 MiB, enforced while streaming.
+- Responses are not cached and upstream cookies are removed.
+- Missing or unavailable rate limiting fails closed with HTTP 503. Rate limiting may return HTTP 429.
+
+**Origin checks are CORS protection, not authentication.** Non-browser clients can forge Origin headers. The rate-limit binding is mandatory abuse protection, not a strict global quota.
 
 ## Verify after deployment
 
-From VoiceCraft, enter your own Fish Audio key and test:
-1. Load the Fish Audio voice/model list.
-2. Generate a short narration.
-3. Generate a longer narration that is split into multiple sections.
-4. Upload an eligible voice sample and create a private Fish Audio clone through the relay.
-5. Confirm that invalid credentials return a useful provider error.
-6. Confirm that oversized TTS and clone uploads are rejected with HTTP 413.
-7. Confirm that the relay returns HTTP 503 if the rate-limit binding is unavailable, and HTTP 429 after the configured limit is exceeded.
-
-Do not publish the relay address as production-ready until these checks pass. Monitor Worker logs and traces for HTTP 429 and 5xx responses.
+Test both providers: load personal voices, search the public library, generate a real preview, generate multi-section narration, check invalid keys, and test cloning only with voices you own or have permission to use. Confirm 503 without the rate-limit binding and 429 when limited. Do not treat the relay as production-ready until these checks pass.

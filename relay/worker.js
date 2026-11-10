@@ -1,165 +1,131 @@
-// VoiceCraft Fish Audio relay for Cloudflare Workers.
+// VoiceCraft shared Cloudflare Worker relay for Fish Audio and ElevenLabs.
 //
 // Required Worker binding:
 //   RATE_LIMITER: Cloudflare Rate Limiting binding (recommended: 20 requests / 60 seconds).
 //
-// The browser Origin check is CORS protection, NOT authentication. API requests
-// must carry the user's Fish Audio bearer token. The relay hashes that token
-// before using it as the rate-limit key; the token is never logged or stored.
+// The browser Origin check is CORS protection, NOT authentication. Each request
+// must carry the user's own provider API key. The Worker hashes that key for
+// rate limiting and never logs or stores it.
 
-const ALLOWED_ORIGIN = 'https://gracefulrosenailspa.github.io';
+const ALLOWED_ORIGINS = new Set([
+  'https://gracefulrosenailspa.github.io',
+  'https://voicecraft-preview-kpp1gw.v2.appdeploy.ai'
+]);
 const FISH_API = 'https://api.fish.audio';
+const ELEVEN_API = 'https://api.elevenlabs.io';
 const MAX_TTS_BODY_BYTES = 1024 * 1024;
 const MAX_CLONE_BODY_BYTES = 25 * 1024 * 1024;
 
-function corsHeaders() {
+function corsHeaders(origin) {
   return {
-    'Access-Control-Allow-Origin': ALLOWED_ORIGIN,
+    'Access-Control-Allow-Origin': origin,
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Authorization, Content-Type, model',
+    'Access-Control-Allow-Headers': 'Authorization, Content-Type, model, xi-api-key',
     'Access-Control-Max-Age': '86400',
     'Vary': 'Origin'
   };
 }
-
 function response(message, status, cors) {
-  return new Response(message, {
-    status,
-    headers: { ...cors, 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' }
-  });
+  return new Response(message, { status, headers: { ...cors, 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' } });
 }
-
 async function readLimitedBody(body, maxBytes) {
   if (!body) return new Uint8Array();
-  const reader = body.getReader();
-  const chunks = [];
+  const reader = body.getReader(), chunks = [];
   let total = 0;
-
   try {
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
       total += value.byteLength;
-      if (total > maxBytes) {
-        await reader.cancel();
-        throw new Error('BODY_TOO_LARGE');
-      }
+      if (total > maxBytes) { await reader.cancel(); throw new Error('BODY_TOO_LARGE'); }
       chunks.push(value);
     }
-  } finally {
-    reader.releaseLock();
-  }
-
+  } finally { reader.releaseLock(); }
   const result = new Uint8Array(total);
   let offset = 0;
-  for (const chunk of chunks) {
-    result.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
+  for (const chunk of chunks) { result.set(chunk, offset); offset += chunk.byteLength; }
   return result;
 }
-
-async function rateLimitKey(authorization) {
-  const digest = await crypto.subtle.digest(
-    'SHA-256',
-    new TextEncoder().encode(authorization)
-  );
+async function rateLimitKey(secret) {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(secret));
   return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
 }
-
+function resolveRoute(pathname, method) {
+  if (pathname === '/model' || pathname.startsWith('/model/')) {
+    if (method === 'OPTIONS' || method === 'GET') return { provider: 'fish', upstreamPath: pathname, upload: false };
+    if (pathname === '/model' && method === 'POST') return { provider: 'fish', upstreamPath: pathname, upload: true };
+    return null;
+  }
+  if (pathname === '/v1/tts' && (method === 'OPTIONS' || method === 'POST')) {
+    return { provider: 'fish', upstreamPath: pathname, upload: false };
+  }
+  if (!pathname.startsWith('/elevenlabs/')) return null;
+  const upstreamPath = pathname.slice('/elevenlabs'.length);
+  const voiceList = upstreamPath === '/v2/voices' || upstreamPath === '/v1/shared-voices';
+  const tts = /^\/v1\/text-to-speech\/[A-Za-z0-9_-]+$/.test(upstreamPath);
+  const clone = upstreamPath === '/v1/voices/add';
+  if (method === 'OPTIONS' && (voiceList || tts || clone)) return { provider: 'eleven', upstreamPath, upload: false };
+  if (method === 'GET' && voiceList) return { provider: 'eleven', upstreamPath, upload: false };
+  if (method === 'POST' && tts) return { provider: 'eleven', upstreamPath, upload: false };
+  if (method === 'POST' && clone) return { provider: 'eleven', upstreamPath, upload: true };
+  return null;
+}
 export default {
   async fetch(request, env) {
-    const cors = corsHeaders();
     const origin = request.headers.get('Origin') || '';
-
-    // This is a browser CORS boundary only. It is not treated as authentication.
-    if (origin !== ALLOWED_ORIGIN) {
-      return response('Forbidden', 403, cors);
+    if (!ALLOWED_ORIGINS.has(origin)) return response('Forbidden: website origin is not allowed', 403, corsHeaders('null'));
+    const cors = corsHeaders(origin), url = new URL(request.url);
+    const route = resolveRoute(url.pathname, request.method);
+    if (!route) {
+      const elevenPath = url.pathname === '/elevenlabs/v2/voices' ||
+        url.pathname === '/elevenlabs/v1/shared-voices' ||
+        /^\/elevenlabs\/v1\/text-to-speech\/[A-Za-z0-9_-]+$/.test(url.pathname) ||
+        url.pathname === '/elevenlabs/v1/voices/add';
+      const knownPath = url.pathname === '/model' || url.pathname.startsWith('/model/') || url.pathname === '/v1/tts' || elevenPath;
+      return response(knownPath ? 'Method not allowed' : 'Not found', knownPath ? 405 : 404, cors);
     }
+    if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
 
-    const url = new URL(request.url);
-    const isModelPath = url.pathname === '/model' || url.pathname.startsWith('/model/');
-    const isTtsPath = url.pathname === '/v1/tts';
-    const isModelUpload = url.pathname === '/model' && request.method === 'POST';
-
-    if (!isModelPath && !isTtsPath) {
-      return response('Not found', 404, cors);
-    }
-
-    if (request.method === 'OPTIONS') {
-      return new Response(null, { status: 204, headers: cors });
-    }
-
-    const allowedMethod = (isModelPath && request.method === 'GET') ||
-      isModelUpload || (isTtsPath && request.method === 'POST');
-    if (!allowedMethod) {
-      return response('Method not allowed', 405, cors);
-    }
-
-    const authorization = request.headers.get('Authorization') || '';
-    if (!/^Bearer\s+\S+/i.test(authorization)) {
-      return response('A Fish Audio bearer token is required', 401, cors);
-    }
-
-    // Fail closed: do not operate an unrestricted public relay if the binding
-    // has not been configured in the Cloudflare Worker settings.
-    if (!env || !env.RATE_LIMITER || typeof env.RATE_LIMITER.limit !== 'function') {
-      return response('Relay rate limiting is not configured', 503, cors);
-    }
-
+    const credential = route.provider === 'fish' ? (request.headers.get('Authorization') || '') : (request.headers.get('xi-api-key') || '');
+    if (route.provider === 'fish' && !/^Bearer\s+\S+/i.test(credential)) return response('A Fish Audio bearer token is required', 401, cors);
+    if (route.provider === 'eleven' && !credential.trim()) return response('An ElevenLabs xi-api-key is required', 401, cors);
+    if (!env || !env.RATE_LIMITER || typeof env.RATE_LIMITER.limit !== 'function') return response('Relay rate limiting is not configured', 503, cors);
     try {
-      const key = await rateLimitKey(authorization);
+      const key = await rateLimitKey(route.provider + ':' + credential);
       const { success } = await env.RATE_LIMITER.limit({ key });
-      if (!success) {
-        return response('Rate limit exceeded. Please wait and try again.', 429, cors);
-      }
-    } catch (error) {
-      // A failed rate-limit check must not silently turn protection off.
-      return response('Relay protection is temporarily unavailable', 503, cors);
-    }
+      if (!success) return response('Rate limit exceeded. Please wait and try again.', 429, cors);
+    } catch (error) { return response('Relay protection is temporarily unavailable', 503, cors); }
 
     let body;
     if (request.method === 'POST') {
-      const bodyLimit = isModelUpload ? MAX_CLONE_BODY_BYTES : MAX_TTS_BODY_BYTES;
-      const declaredLength = Number(request.headers.get('Content-Length') || 0);
-      if (declaredLength > bodyLimit) {
-        return response('Request body is too large', 413, cors);
-      }
-      try {
-        body = await readLimitedBody(request.body, bodyLimit);
-      } catch (error) {
-        if (error && error.message === 'BODY_TOO_LARGE') {
-          return response('Request body is too large', 413, cors);
-        }
+      const limit = route.upload ? MAX_CLONE_BODY_BYTES : MAX_TTS_BODY_BYTES;
+      if (Number(request.headers.get('Content-Length') || 0) > limit) return response('Request body is too large', 413, cors);
+      try { body = await readLimitedBody(request.body, limit); }
+      catch (error) {
+        if (error && error.message === 'BODY_TOO_LARGE') return response('Request body is too large', 413, cors);
         return response('Could not read request body', 400, cors);
       }
-      if (!body.byteLength) {
-        return response('Request body is required', 400, cors);
-      }
+      if (!body.byteLength) return response('Request body is required', 400, cors);
     }
 
     const headers = new Headers();
-    headers.set('Authorization', authorization);
+    headers.set(route.provider === 'fish' ? 'Authorization' : 'xi-api-key', credential);
     for (const name of ['content-type', 'model']) {
       const value = request.headers.get(name);
       if (value) headers.set(name, value);
     }
-
     try {
-      const upstream = await fetch(FISH_API + url.pathname + url.search, {
-        method: request.method,
-        headers,
-        body: request.method === 'POST' ? body : undefined,
-        redirect: 'error'
+      const base = route.provider === 'fish' ? FISH_API : ELEVEN_API;
+      const upstream = await fetch(base + route.upstreamPath + url.search, {
+        method: request.method, headers, body: request.method === 'POST' ? body : undefined, redirect: 'error'
       });
-
       const out = new Headers(upstream.headers);
       for (const [name, value] of Object.entries(cors)) out.set(name, value);
       out.set('Cache-Control', 'no-store');
       out.delete('set-cookie');
       return new Response(upstream.body, { status: upstream.status, headers: out });
     } catch (error) {
-      return response('Fish Audio could not be reached by the relay', 502, cors);
+      return response(route.provider === 'fish' ? 'Fish Audio could not be reached by the relay' : 'ElevenLabs could not be reached by the relay', 502, cors);
     }
   }
 };
