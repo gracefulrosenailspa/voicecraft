@@ -31,6 +31,13 @@ try {
   await page.addInitScript(dataUrl => {
     const makeAudio = () => { const audio = new Audio(); audio.src = dataUrl; return audio; };
     window.__ttsCalls = [];
+    window.__speechPreviewCalls = [];
+    window.SpeechSynthesisUtterance = class { constructor(text) { this.text = text; } };
+    Object.defineProperty(window, 'speechSynthesis', { configurable: true, value: {
+      cancel() {},
+      getVoices() { return [{ name: 'Test device voice', lang: 'en-US', voiceURI: 'test' }]; },
+      speak(utterance) { window.__speechPreviewCalls.push({ text: utterance.text }); if (utterance.onstart) utterance.onstart(); if (utterance.onend) utterance.onend(); }
+    }});
     window.puter = { ai: { txt2speech: async (text, options) => { window.__ttsCalls.push({ text, options }); return makeAudio(); }, speech2speech: async () => makeAudio() } };
   }, wavData);
   await page.goto(origin, { waitUntil: 'domcontentloaded' });
