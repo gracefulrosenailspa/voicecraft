@@ -516,7 +516,7 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
     elevenlabs: {
       label: 'ElevenLabs',
       voices: ['Rachel', 'Bella', 'Antoni', 'Josh', 'Arnold', 'Adam', 'Elli', 'Sam', 'Domi'],
-      models: ['eleven_multilingual_v2', 'eleven_v3', 'eleven_flash_v2_5'],
+      models: ['eleven_v4', 'eleven_v4_turbo', 'eleven_v3', 'eleven_v3_conversational', 'eleven_multilingual_v2', 'eleven_flash_v2_5', 'eleven_flash_v2'],
       star: ['Adam', 'Josh', 'Arnold', 'Antoni']
     },
     'aws-polly': {
@@ -1090,7 +1090,7 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
       o.model = S.cModel;
       var intensity = S.intensity / 100;
       var stability = clamp(0.8 - 0.6 * intensity, 0.2, 0.8);
-      if (S.cModel === 'eleven_v3') stability = stability < 0.25 ? 0 : (stability < 0.75 ? 0.5 : 1);
+      if (/_v3/.test(S.cModel)) stability = stability < 0.25 ? 0 : (stability < 0.75 ? 0.5 : 1);
       o.voice_settings = { stability: stability, similarity_boost: 0.75, speed: 1 };
     }
     if (S.cProvider === 'speechify') o.model = S.cModel;
