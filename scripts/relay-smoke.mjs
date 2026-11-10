@@ -50,6 +50,27 @@ try {
   assert.equal(upstreamCalls[0].headers.get('Authorization'), token, 'bearer token reaches Fish Audio');
   console.log('PASS: authenticated upstream proxy, no-store response and hashed rate-limit key');
 
+  // ElevenLabs routes share the same relay and per-user rate limiting.
+  upstreamCalls = [];
+  const elevenPreflight = await expectStatus(request('/elevenlabs/v2/voices', { method: 'OPTIONS', headers: { 'Access-Control-Request-Headers': 'xi-api-key' } }), allowed, 204, 'allow ElevenLabs CORS preflight');
+  assert.match(elevenPreflight.headers.get('Access-Control-Allow-Headers') || '', /xi-api-key/i, 'CORS allows the ElevenLabs API key header');
+  await expectStatus(request('/elevenlabs/v2/voices', { method: 'GET' }), allowed, 401, 'require an ElevenLabs API key');
+  const elevenVoices = await expectStatus(request('/elevenlabs/v2/voices?page_size=1', { method: 'GET', headers: { 'xi-api-key': 'voicecraft-eleven-test' } }), allowed, 200, 'proxy ElevenLabs personal voices');
+  assert.equal(upstreamCalls[0].url, 'https://api.elevenlabs.io/v2/voices?page_size=1', 'ElevenLabs voice list is forwarded to the correct upstream path');
+  assert.equal(upstreamCalls[0].headers.get('xi-api-key'), 'voicecraft-eleven-test', 'ElevenLabs key is forwarded to the provider');
+  assert.equal(elevenVoices.headers.get('Cache-Control'), 'no-store', 'ElevenLabs response is not cached');
+  console.log('PASS: ElevenLabs CORS, key validation and personal voice-list proxy');
+
+  upstreamCalls = [];
+  const elevenLibrary = await expectStatus(request('/elevenlabs/v1/shared-voices?page_size=5', { method: 'GET', headers: { 'xi-api-key': 'voicecraft-eleven-test' } }), allowed, 200, 'proxy ElevenLabs public library');
+  assert.equal(upstreamCalls[0].url, 'https://api.elevenlabs.io/v1/shared-voices?page_size=5', 'public library route is forwarded');
+  await expectStatus(request('/elevenlabs/v1/text-to-speech/voice_123', { method: 'POST', headers: { 'xi-api-key': 'voicecraft-eleven-test', 'Content-Type': 'application/json' }, body: '{"text":"Hello"}' }), allowed, 200, 'proxy ElevenLabs TTS');
+  assert.equal(upstreamCalls[1].url, 'https://api.elevenlabs.io/v1/text-to-speech/voice_123', 'TTS route is forwarded');
+  assert.equal(upstreamCalls[1].method, 'POST', 'TTS is forwarded as POST');
+  await expectStatus(request('/elevenlabs/v1/text-to-speech/voice_123/extra', { method: 'POST', headers: { 'xi-api-key': 'voicecraft-eleven-test' }, body: '{}' }), allowed, 404, 'reject unapproved ElevenLabs paths');
+  console.log('PASS: ElevenLabs public library and text-to-speech routes');
+
+
   upstreamCalls = [];
   const form = new FormData();
   form.append('type', 'tts');
