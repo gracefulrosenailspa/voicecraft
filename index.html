@@ -1269,6 +1269,12 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
 
   async function loadFile(f) {
     labStop();
+    var priorDownload = $('labDownload');
+    if (priorDownload) priorDownload.remove();
+    if (labExportUrl) { URL.revokeObjectURL(labExportUrl); labExportUrl = null; }
+    labBuf = null;
+    $('labPlay').disabled = true;
+    $('labExport').disabled = true;
     labStatus('Reading ' + f.name + '…');
     try {
       var ab = await f.arrayBuffer();
@@ -1281,7 +1287,6 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
       $('dropSub').textContent = fmt(buf.duration) + ' · tap to choose another';
       $('labPlay').disabled = false;
       $('labExport').disabled = false;
-      var priorDownload = $('labDownload'); if (priorDownload) priorDownload.remove();
       labLabels(); drawWave();
       labStatus('Loaded. Press Play and move the sliders while it runs.');
     } catch (err) {
@@ -1311,7 +1316,12 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
     var len = Math.floor(c.sampleRate * secs), b = c.createBuffer(2, len, c.sampleRate);
     for (var ch = 0; ch < 2; ch++) {
       var d = b.getChannelData(ch);
-      for (var i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, decay);
+      var state = 2463534242;
+      for (var i = 0; i < len; i++) {
+        state ^= state << 13; state ^= state >>> 17; state ^= state << 5;
+        var noise = (state >>> 0) / 4294967295 * 2 - 1;
+        d[i] = noise * Math.pow(1 - i / len, decay);
+      }
     }
     return b;
   }
@@ -1849,6 +1859,16 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
   showView(location.hash.slice(1));
   window.addEventListener('pagehide', function () { if (synth) synth.cancel(); });
 })();
+</script>
+
+<script>
+  // Register the app-shell service worker. Cloud TTS and provider APIs still require internet.
+  if ('serviceWorker' in navigator && window.isSecureContext) {
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('./service-worker.js', { scope: './' })
+        .catch(function (error) { console.warn('VoiceCraft offline shell registration failed:', error); });
+    });
+  }
 </script>
 
 </body>
