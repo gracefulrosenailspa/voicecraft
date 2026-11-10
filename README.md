@@ -11,6 +11,7 @@ A browser-based text-to-speech and voice-processing studio. The front end is a s
 - **Voice Lab:** load an audio recording, preview depth, warmth and room effects, export a processed WAV, or send the recording to a supported voice-cloning / re-voice provider.
 - **Downloads:** download generated sections individually and, when provider audio can be fetched by the browser, export a combined narration WAV.
 - **WAV safety:** combined narration and Voice Lab exports are limited to 32 MiB to reduce mobile browser memory pressure. For longer output, download generated sections individually.
+- **Install icons:** includes 192px and 512px PNG icons for Chromium installation, plus the scalable SVG brand icon.
 
 ## Run and deploy
 
