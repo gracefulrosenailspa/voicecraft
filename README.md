@@ -69,7 +69,7 @@ To run the browser smoke suite locally, install Playwright and Chromium, start a
 
 The browser suite checks app startup, narration editing, mocked Puter generation and combined WAV export, Voice Lab decode and processed WAV export, mocked re-voice, stale-download cleanup and offline app-shell reopening. Provider calls are mocked; this does not verify real account access or billing.
 
-GitHub Actions runs static checks and browser smoke tests on pushes to main and security/**, and on pull requests targeting main.
+GitHub Actions runs static checks, relay security tests and browser smoke tests on pushes to main and on pull requests targeting main.
 
 ## Known testing boundary
 
