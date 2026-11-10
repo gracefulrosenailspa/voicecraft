@@ -1202,7 +1202,7 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
         $('bar').style.width = Math.round((done / chunks.length) * 100) + '%';
       }
       if (done && completeBlobs.length === done) addCombinedWavButton(completeBlobs);
-      setStatus(cloudCancel ? 'Stopped. ' + done + ' sections ready.' : 'Done. Play or download your sections below.');
+      setStatus(cloudCancel ? 'Stopped. ' + done + ' sections ready.' : (done && completeBlobs.length !== done ? 'Done. Individual sections are ready. Complete WAV export was unavailable from the provider audio links.' : 'Done. Play or download your sections below.'));
     } catch (err) {
       setStatus('Generation stopped: ' + (err && err.message ? err.message : String(err)));
     } finally {
