@@ -1515,20 +1515,23 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
   }
   async function rvConvert() {
     if (!STANDALONE) { rvStatus('Re-voice needs the standalone file.'); return; }
-    var sourceFile = labFile;
+    var sourceFile = labFile, sourceLoad = labLoadSeq;
     if (!sourceFile) { rvStatus('Load a recording above first.'); return; }
     $('rvGo').disabled = true;
-    rvStatus('Loading Puter…');
-    try { await ensurePuter(); } catch (e) { /* handled below */ }
-    if (sourceFile !== labFile) { rvStatus('The selected recording changed. Please try again.'); $('rvGo').disabled = !labFile; return; }
-    if (!window.puter || !window.puter.ai || !window.puter.ai.speech2speech) {
-      rvStatus('Puter did not load. Check your connection and refresh the page.');
-      return;
-    }
     $('rvOut').textContent = '';
-    rvStatus('Converting. Puter may ask you to sign in.');
     try {
-      var audio = await window.puter.ai.speech2speech({ audio: labFile, voice: $('rvVoice').value });
+      rvStatus('Loading Puter…');
+      try { await ensurePuter(); } catch (e) { /* reported below */ }
+      if (sourceFile !== labFile || sourceLoad !== labLoadSeq) {
+        rvStatus('The selected recording changed. Please try again.');
+        return;
+      }
+      if (!window.puter || !window.puter.ai || !window.puter.ai.speech2speech) {
+        throw new Error('Puter did not load. Check your connection and refresh the page.');
+      }
+      rvStatus('Converting. Puter may ask you to sign in.');
+      var audio = await window.puter.ai.speech2speech({ audio: sourceFile, voice: $('rvVoice').value });
+      if (sourceFile !== labFile || sourceLoad !== labLoadSeq) return;
       if (!audio || !audio.src) throw new Error('No audio was returned.');
       var card = document.createElement('div'); card.className = 'audio-card';
       var t = document.createElement('strong'); t.textContent = 'Converted recording'; card.appendChild(t);
@@ -1538,10 +1541,12 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
       $('rvOut').appendChild(card);
       rvStatus('Done.');
     } catch (err) {
-      var msg = err && err.message ? err.message : (typeof err === 'string' ? err : 'unknown error');
-      rvStatus('Conversion failed: ' + msg);
+      if (sourceFile === labFile && sourceLoad === labLoadSeq) {
+        var msg = err && err.message ? err.message : (typeof err === 'string' ? err : 'unknown error');
+        rvStatus('Conversion failed: ' + msg);
+      }
     } finally {
-      $('rvGo').disabled = false;
+      $('rvGo').disabled = !labFile;
     }
   }
   $('rvGo').addEventListener('click', rvConvert);
