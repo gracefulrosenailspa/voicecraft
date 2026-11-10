@@ -1019,7 +1019,13 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
     pSel.value = S.cProvider;
     var c = CLOUD[S.cProvider], vSel = $('cVoice');
     vSel.textContent = '';
-    var ordered = c.star.concat(c.voices.filter(function (v) { return c.star.indexOf(v) < 0; }));
+    // OpenAI's extra expressive voices are only accepted by gpt-4o-mini-tts.
+    var availableVoices = c.voices.filter(function (v) {
+      return S.cProvider !== 'openai' || S.cModel === 'gpt-4o-mini-tts' ||
+        ['ballad', 'verse', 'marin', 'cedar'].indexOf(v) < 0;
+    });
+    var ordered = c.star.filter(function (v) { return availableVoices.indexOf(v) >= 0; })
+      .concat(availableVoices.filter(function (v) { return c.star.indexOf(v) < 0; }));
     ordered.forEach(function (v) {
       var o = document.createElement('option'); o.value = v;
       o.textContent = (c.star.indexOf(v) >= 0 ? '★ ' : '') + v; vSel.appendChild(o);
@@ -1041,7 +1047,7 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
     fillCloud(); persist();
   });
   $('cVoice').addEventListener('change', function () { S.cVoice = $('cVoice').value; persist(); });
-  $('cModel').addEventListener('change', function () { S.cModel = $('cModel').value; persist(); });
+  $('cModel').addEventListener('change', function () { S.cModel = $('cModel').value; fillCloud(); persist(); });
   $('direction').addEventListener('input', function () { S.direction = $('direction').value; persist(); });
 
   function splitChunks(text) {
