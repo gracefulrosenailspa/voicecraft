@@ -23,6 +23,8 @@ jobs:
         run: |
           node --check service-worker.js
           node --check relay/worker.js
+      - name: Test relay security and upload limits
+        run: node scripts/relay-smoke.mjs
       - name: Validate app structure and inline scripts
         run: node scripts/validate.mjs
       - name: Install Playwright and Chromium
