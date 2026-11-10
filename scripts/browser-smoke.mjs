@@ -32,6 +32,8 @@ try {
     const makeAudio = () => { const audio = new Audio(); audio.src = dataUrl; return audio; };
     window.__ttsCalls = [];
     window.__speechPreviewCalls = [];
+    window.__confirmResult = true;
+    window.confirm = () => window.__confirmResult;
     window.SpeechSynthesisUtterance = class { constructor(text) { this.text = text; } };
     Object.defineProperty(window, 'speechSynthesis', { configurable: true, value: {
       cancel() {},
@@ -72,7 +74,58 @@ try {
   assert.match(freePreview.text, /world does not change in a moment/i, 'free audition uses the short generic sample');
   assert.equal(await page.locator('#previewCloudAudio').count(), 0, 'generic preview does not create provider audio');
   assert.equal(await page.evaluate(() => window.__ttsCalls.length), 0, 'generic preview makes no paid provider TTS request');
-  console.log('PASS: generic voice audition uses device speech without provider credits');  await page.locator('#script').fill('VoiceCraft browser smoke test.');
+  console.log('PASS: generic voice audition uses device speech without provider credits');
+
+  // Verify real-provider audition wiring with mocked network responses only.
+  const providerRequests = [];
+  page.on('request', request => {
+    if (/api\\.fish\\.audio|api\\.elevenlabs\\.io/.test(request.url())) {
+      providerRequests.push({ url: request.url(), method: request.method(), headers: request.headers(), postData: request.postData() });
+    }
+  });
+  await page.route('https://api.fish.audio/v1/tts', route => route.fulfill({
+    status: 200, contentType: 'audio/mpeg', headers: { 'Access-Control-Allow-Origin': '*' }, body: Buffer.from([0x49, 0x44, 0x33, 0x04])
+  }));
+  await page.route('https://api.elevenlabs.io/v1/text-to-speech/**', route => route.fulfill({
+    status: 200, contentType: 'audio/mpeg', headers: { 'Access-Control-Allow-Origin': '*' }, body: Buffer.from([0x49, 0x44, 0x33, 0x04])
+  }));
+  await page.locator('#engineSeg button[data-engine="keys"]').click();
+  assert.equal(await page.locator('#keysVoice').isVisible(), true, 'Pro provider controls appear when Pro keys engine is selected');
+  await page.locator('#previewOnline').click();
+  assert.match(await page.locator('#previewOnlineStatus').textContent(), /Add your Fish Audio API key/i, 'missing Fish Audio key is handled before any request');
+  assert.equal(providerRequests.length, 0, 'missing provider key sends no request');
+
+  await page.locator('#keyIn').fill('fish-test-key');
+  await page.evaluate(() => { window.__confirmResult = false; });
+  await page.locator('#previewOnline').click();
+  assert.match(await page.locator('#previewOnlineStatus').textContent(), /Cancelled/i, 'provider credit confirmation can be declined');
+  assert.equal(providerRequests.length, 0, 'declining provider credit confirmation sends no request');
+
+  await page.evaluate(() => { window.__confirmResult = true; });
+  await page.locator('#previewOnline').click();
+  await page.getByText(/Real Fish Audio sample generated/i).waitFor({ timeout: 10000 });
+  assert.equal(providerRequests.length, 1, 'Fish Audio preview sends exactly one provider request');
+  assert.equal(providerRequests[0].url, 'https://api.fish.audio/v1/tts', 'Fish Audio preview uses the TTS endpoint');
+  assert.equal(providerRequests[0].headers.authorization, 'Bearer fish-test-key', 'Fish Audio preview sends the selected API key');
+  assert.match(providerRequests[0].postData || '', /quiet decision at a time/i, 'Fish Audio receives the short audition sample');
+  assert.equal(await page.locator('#previewOnlineAudio').isVisible(), true, 'Fish Audio sample audio player is shown');
+
+  await page.locator('#kService').selectOption('eleven');
+  await page.locator('#keyIn').fill('eleven-test-key');
+  await page.locator('#previewOnline').click();
+  assert.match(await page.locator('#previewOnlineStatus').textContent(), /Choose an ElevenLabs voice first/i, 'ElevenLabs requires a selected voice ID');
+  assert.equal(providerRequests.length, 1, 'missing ElevenLabs voice ID sends no request');
+  await page.locator('#kVoiceManual').fill('eleven-test-voice-id');
+  await page.locator('#previewOnline').click();
+  await page.getByText(/Real ElevenLabs sample generated/i).waitFor({ timeout: 10000 });
+  assert.equal(providerRequests.length, 2, 'ElevenLabs preview sends exactly one provider request');
+  assert.match(providerRequests[1].url, /api\\.elevenlabs\\.io\\/v1\\/text-to-speech\\/eleven-test-voice-id/, 'ElevenLabs preview uses the selected voice ID');
+  assert.equal(providerRequests[1].headers['xi-api-key'], 'eleven-test-key', 'ElevenLabs preview sends the selected API key');
+  assert.match(providerRequests[1].postData || '', /eleven_multilingual_v2/, 'ElevenLabs preview sends the selected model');
+  assert.equal(await page.locator('#previewOnlineAudio').isVisible(), true, 'ElevenLabs sample audio player is shown');
+  console.log('PASS: Fish Audio and ElevenLabs audition flows, key checks, voice-ID validation and credit confirmation (network mocked)');
+
+  await page.locator('#script').fill('VoiceCraft browser smoke test.');
   await page.waitForFunction(() => document.querySelector('#count')?.textContent.includes('30'), null, { timeout: 5000 });
   await page.setViewportSize({ width: 390, height: 844 });
   const mobileLayout = await page.evaluate(() => ({
