@@ -56,6 +56,7 @@ assert(/maxWavBytes\s*=\s*32\s*\*\s*1024\s*\*\s*1024/.test(html), 'combined WAV 
 assert(/voice_settings\s*=\s*\{\s*stability:/.test(html), 'cloud ElevenLabs receives supported voice tuning settings');
 assert(!/Your file is not uploaded anywhere/i.test(html), 'Voice Lab does not make a false no-upload promise');
 assert(/Re-voice uploads your recording to Puter/i.test(html), 'Voice Lab discloses the re-voice provider upload');
+assert(/id="rvConsent"/.test(html) && /!\$\('rvConsent'\)\.checked/.test(html), 're-voice requires permission confirmation before upload');
 assert(/Fish Audio relay uploads are limited to 25 MiB/i.test(html), 'Fish Audio relay clone upload limit is disclosed');
 
 for (const id of ['labExport', 'labPlay', 'cloneGo', 'rvGo']) {
