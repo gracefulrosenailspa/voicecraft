@@ -1,18 +1,29 @@
 # VoiceCraft Fish Audio relay setup
 
-The relay in `relay/worker.js` is intentionally fail-closed. It will return HTTP 503 until a Cloudflare Rate Limiting binding named `RATE_LIMITER` is configured. Do not remove that check to make the relay appear to work: an unrestricted relay can be abused.
+The relay in `relay/worker.js` is intentionally fail-closed. It returns HTTP 503 until a Cloudflare Rate Limiting binding named `RATE_LIMITER` is configured. Do not remove that check to make the relay appear to work: an unrestricted relay can be abused.
 
 ## Configure the required Cloudflare binding
 
-1. Open **Cloudflare Dashboard → Workers & Pages**.
-2. Open the Worker that serves as your VoiceCraft Fish Audio relay.
-3. Open **Settings → Bindings** and add a **Rate limiting** binding.
-4. Set the variable name to exactly `RATE_LIMITER`.
-5. Choose a unique numeric namespace ID for this Cloudflare account. Do not copy an ID from another account or Worker.
-6. Set the limit to **20 requests per 60 seconds** as a starting point.
-7. Save the binding and deploy a new Worker version containing the updated `relay/worker.js`.
+Cloudflare's Workers Rate Limiting API is configured through the Worker's Wrangler configuration. It is not a normal dashboard-only variable.
 
-Cloudflare's Worker Rate Limiting API is approximate and is enforced per Cloudflare location. It is useful abuse protection, but it is not a strict global quota. See the [Cloudflare Rate Limiting documentation](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/).
+Add this to the existing `wrangler.toml` for the Worker that runs `relay/worker.js`:
+
+```toml
+[[ratelimits]]
+name = "RATE_LIMITER"
+# Replace this with a positive integer unique to your Cloudflare account.
+namespace_id = "REPLACE_WITH_YOUR_OWN_UNIQUE_INTEGER"
+
+  [ratelimits.simple]
+  limit = 20
+  period = 60
+```
+
+Do not deploy until you replace the placeholder with a unique numeric namespace ID for your Cloudflare account. Keep any existing Worker name, entry-point, compatibility date, and other settings in your current Wrangler configuration. The `main` entry must point to `relay/worker.js` (or to the actual path you use for this Worker).
+
+Then deploy the Worker using Wrangler from the directory containing that configuration. If you do not currently use Wrangler to deploy this Worker, stop and check the current deployment method before changing it. Do not create a second Worker by accident.
+
+Cloudflare's Worker Rate Limiting API is approximate and enforced separately in each Cloudflare location. Requests may exceed the configured threshold briefly. It is useful abuse protection, not a strict global quota. For strict global limits, Cloudflare recommends a Durable Object-based limiter. See the [Cloudflare Rate Limiting documentation](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/).
 
 ## What the relay enforces
 
@@ -33,6 +44,6 @@ From VoiceCraft, enter your own Fish Audio key and test:
 2. Generate a short narration.
 3. Generate a longer narration that is split into multiple sections.
 4. Confirm that invalid credentials return a useful provider error.
-5. Confirm that the relay rejects requests when the rate-limit binding is removed or unavailable.
+5. Confirm that the relay returns HTTP 503 if the rate-limit binding is unavailable, and HTTP 429 after the configured limit is exceeded.
 
-Do not publish the relay address as production-ready until these checks pass. Cloudflare rate limits are approximate, so monitor Worker analytics for HTTP 429 and 5xx responses.
+Do not publish the relay address as production-ready until these checks pass. Monitor Worker logs and traces for HTTP 429 and 5xx responses.
