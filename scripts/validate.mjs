@@ -54,6 +54,9 @@ assert(/availableVoices\s*=\s*c\.voices\.filter/.test(html), 'OpenAI voices are 
 assert(/labLoadSeq/.test(html), 'Voice Lab rejects stale file-load and export results');
 assert(/maxWavBytes\s*=\s*32\s*\*\s*1024\s*\*\s*1024/.test(html), 'combined WAV export has a mobile memory limit');
 assert(/voice_settings\s*=\s*\{\s*stability:/.test(html), 'cloud ElevenLabs receives supported voice tuning settings');
+assert(!/Your file is not uploaded anywhere/i.test(html), 'Voice Lab does not make a false no-upload promise');
+assert(/Re-voice uploads your recording to Puter/i.test(html), 'Voice Lab discloses the re-voice provider upload');
+assert(/Fish Audio relay uploads are limited to 25 MiB/i.test(html), 'Fish Audio relay clone upload limit is disclosed');
 
 for (const id of ['labExport', 'labPlay', 'cloneGo', 'rvGo']) {
   assert(ids.includes(id), 'critical Voice Lab control exists: ' + id);
