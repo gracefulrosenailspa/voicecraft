@@ -120,6 +120,8 @@ try {
   await page.getByText(/could not decode the file/i).waitFor({ timeout: 10000 });
   assert.equal(await page.locator('#labDownload').count(), 0, 'a failed new file load clears the stale WAV download');
   assert.equal(await page.locator('#labExport').isDisabled(), true, 'export stays disabled when the new file cannot be decoded');
+  assert.equal(await page.locator('#rvConsent').isChecked(), false, 're-voice permission resets for a new recording');
+  assert.equal(await page.locator('#cloneConsent').isChecked(), false, 'clone permission resets for a new recording');
   console.log('PASS: failed file replacement clears stale export controls');
 
   await page.evaluate(async () => {
