@@ -225,6 +225,9 @@ input[type="range"] { width: 100%; accent-color: var(--accent); min-height: 28px
 
 .pair { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
 .pair .btn { padding-inline: 14px; }
+.voice-preview { display: grid; gap: 8px; }
+.voice-preview audio { width: 100%; margin-top: 4px; }
+.voice-preview .note { min-height: 18px; }
 
 /* Voice lab */
 .lab { max-width: 760px; margin: 0 auto; padding-top: 22px; display: grid; gap: 18px; }
@@ -342,6 +345,7 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
           <div class="field">
             <label for="voice">Voice <output id="voiceCount"></output></label>
             <select id="voice"></select>
+          <div class="voice-preview"><button class="btn" id="previewDevice" type="button">▶ Preview selected voice</button><p class="note" id="previewDeviceStatus" role="status" aria-live="polite">Hear a short sample before choosing.</p></div>
           </div>
           <p class="note">♂ marks voices whose names suggest a male voice. Your device decides what is installed. Some online browser voices ignore pitch and pace.</p>
         </section>
@@ -350,6 +354,7 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
           <h3>Cloud voice</h3>
           <div class="field"><label for="cProvider">Provider</label><select id="cProvider"></select></div>
           <div class="field"><label for="cVoice">Voice</label><select id="cVoice"></select></div>
+          <div class="voice-preview"><button class="btn" id="previewCloud" type="button">▶ Preview selected voice</button><p class="note" id="previewCloudStatus" role="status" aria-live="polite">A short cloud sample will be generated using the selected provider.</p><audio id="previewCloudAudio" controls hidden></audio></div>
           <div class="field" id="cModelField"><label for="cModel">Model</label><select id="cModel"></select></div>
           <div class="field"><label for="direction">Extra direction</label><input type="text" id="direction" placeholder="e.g. Warm Kenyan storyteller, mature voice"></div>
           <p class="note">★ marks suggestions for deep male narration. Each section is a separate request to the provider, so limits or charges from your Puter account can apply.</p>
@@ -368,6 +373,7 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
             <button class="btn" id="kLoad" type="button">Load voices</button>
           </div>
           <div class="field"><label for="kVoice">Voice <output id="kCount"></output></label><select id="kVoice"></select></div>
+          <div class="voice-preview"><button class="btn" id="previewKeys" type="button">▶ Preview selected voice</button><p class="note" id="previewKeysStatus" role="status" aria-live="polite">Uses your selected Fish Audio or ElevenLabs voice.</p><audio id="previewKeysAudio" controls hidden></audio></div>
           <div class="field"><label for="kVoiceManual">Or paste a voice ID</label><input type="text" id="kVoiceManual" autocomplete="off" spellcheck="false"></div>
           <div class="field" id="kRelayField"><label for="kRelay">Relay address, Fish Audio only</label><input type="text" id="kRelay" autocomplete="off" spellcheck="false" placeholder="https://voicecraft-relay.your-name.workers.dev"></div>
           <p class="note" id="kNote"></p>
@@ -883,6 +889,79 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
     setStatus('Stopped.');
     finish();
   }
+  var PREVIEW_TEXT = 'The world does not change in a moment. Sometimes, it changes one quiet decision at a time. Take a breath, listen closely, and let this story unfold.';
+  var previewUrls = [];
+  function clearPreviewAudio(id) {
+    var audio = $(id);
+    if (audio) { audio.pause(); audio.removeAttribute('src'); audio.load(); audio.hidden = true; }
+  }
+  function showPreviewAudio(audioId, statusId, blob, label) {
+    var audio = $(audioId);
+    var url = URL.createObjectURL(blob);
+    previewUrls.push(url);
+    audio.src = url;
+    audio.hidden = false;
+    audio.play().catch(function () { $(statusId).textContent = label + ' is ready. Tap play to listen.'; });
+  }
+  async function previewSelectedVoice(kind) {
+    var button = $('preview' + kind.charAt(0).toUpperCase() + kind.slice(1));
+    var statusId = 'preview' + kind.charAt(0).toUpperCase() + kind.slice(1) + 'Status';
+    var audioId = 'preview' + kind.charAt(0).toUpperCase() + kind.slice(1) + 'Audio';
+    if (button.disabled) return;
+    button.disabled = true;
+    if (kind !== 'device') clearPreviewAudio(audioId);
+    try {
+      if (kind === 'device') {
+        if (!synth) throw new Error('Speech is not supported in this browser.');
+        var selected = currentVoice();
+        if (!selected) throw new Error('No device voice is selected. Try another language or refresh the voice list.');
+        synth.cancel();
+        var utterance = new SpeechSynthesisUtterance(PREVIEW_TEXT);
+        utterance.voice = selected;
+        utterance.lang = selected.lang;
+        var e = effective();
+        utterance.pitch = clamp(e.pitch, 0.1, 2);
+        utterance.rate = clamp(e.rate, 0.5, 1.8);
+        utterance.volume = clamp(e.vol, 0, 1);
+        utterance.onstart = function () { $(statusId).textContent = 'Playing ' + selected.name + '…'; };
+        utterance.onend = function () { $(statusId).textContent = 'Preview finished. Choose another voice to compare.'; button.disabled = false; };
+        utterance.onerror = function (event) { $(statusId).textContent = 'Preview failed: ' + (event.error || 'speech error'); button.disabled = false; };
+        $(statusId).textContent = 'Starting device voice preview…';
+        synth.speak(utterance);
+        return;
+      }
+      if (!STANDALONE) throw new Error('Cloud voice previews are disabled in this embedded preview. Open the published VoiceCraft app directly.');
+      if (kind === 'cloud') {
+        await ensurePuter();
+        if (!window.puter || !window.puter.ai || !window.puter.ai.txt2speech) throw new Error('Puter did not load. Check your connection and refresh.');
+        var req = cloudRequest(PREVIEW_TEXT);
+        var result = await window.puter.ai.txt2speech(req.text, req.options);
+        if (!result || !result.src) throw new Error('The provider returned no playable audio.');
+        var response = await fetch(result.src);
+        if (!response.ok) throw new Error('Could not retrieve the preview audio.');
+        showPreviewAudio(audioId, statusId, await response.blob(), 'Preview');
+        $(statusId).textContent = 'Preview generated with ' + CLOUD[S.cProvider].label + '.';
+        return;
+      }
+      var service = ksvc(), key = (KEYS[service] || '').trim(), voice = kCurrentVoice();
+      if (!key) throw new Error('Add your ' + svcName(service) + ' API key first.');
+      if (service === 'eleven' && !voice) throw new Error('Choose an ElevenLabs voice or paste a voice ID first.');
+      var request = kRequest(service, key, voice, PREVIEW_TEXT);
+      var response2 = await apiFetch(request.url, request.opts, svcName(service));
+      var blob = await response2.blob();
+      if (!blob.size) throw new Error('The service returned empty preview audio.');
+      showPreviewAudio(audioId, statusId, blob, 'Preview');
+      $(statusId).textContent = 'Preview generated with ' + svcName(service) + '.';
+    } catch (error) {
+      $(statusId).textContent = 'Preview unavailable: ' + (error && error.message ? error.message : String(error));
+    } finally {
+      button.disabled = false;
+    }
+  }
+  $('previewDevice').addEventListener('click', function () { previewSelectedVoice('device'); });
+  $('previewCloud').addEventListener('click', function () { previewSelectedVoice('cloud'); });
+  $('previewKeys').addEventListener('click', function () { previewSelectedVoice('keys'); });
+
   function hear() {
     if (!synth) return;
     if (state !== 'idle') stop();
