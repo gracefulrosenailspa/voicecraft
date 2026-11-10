@@ -1646,7 +1646,7 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
   }
 
   function providerRelayUrl(url, who) {
-    var relay = (S.kRelay || '').trim().replace(/\\/+$/, '');
+    var relay = (S.kRelay || '').trim().replace(/\/+$/, '');
     if (!relay) return url;
     if (who === 'ElevenLabs') {
       var upstream = new URL(url);
