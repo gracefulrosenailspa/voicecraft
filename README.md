@@ -52,15 +52,22 @@ The current relay allows browser requests from the VoiceCraft GitHub Pages origi
 
 ## Developer checks
 
-No dependency install or build is required. With Node.js 22 or later, run:
+The front end has no build step. With Node.js 22 or later, run the static checks:
 
     node --check service-worker.js
     node --check relay/worker.js
     node scripts/validate.mjs
 
-GitHub Actions runs these checks on pushes to main and security/**, and on pull requests targeting main.
+To run the browser smoke suite locally, install Playwright and Chromium, start a static server in the repository root, then run the test:
 
-The checks validate JavaScript syntax, manifest and shell structure, duplicate HTML IDs and selected critical controls. They do not replace browser testing.
+    npm install --no-save --no-package-lock playwright
+    npx playwright install chromium
+    python3 -m http.server 4173 --bind 127.0.0.1
+    node scripts/browser-smoke.mjs
+
+The browser suite checks app startup, narration editing, mocked Puter generation and combined WAV export, Voice Lab decode and processed WAV export, mocked re-voice, stale-download cleanup and offline app-shell reopening. Provider calls are mocked; this does not verify real account access or billing.
+
+GitHub Actions runs static checks and browser smoke tests on pushes to main and security/**, and on pull requests targeting main.
 
 ## Known testing boundary
 
