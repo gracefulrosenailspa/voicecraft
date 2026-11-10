@@ -79,7 +79,7 @@ try {
   // Verify real-provider audition wiring with mocked network responses only.
   const providerRequests = [];
   page.on('request', request => {
-    if (/api\\.fish\\.audio|api\\.elevenlabs\\.io/.test(request.url())) {
+    if (/api\.fish\.audio|api\.elevenlabs\.io/.test(request.url())) {
       providerRequests.push({ url: request.url(), method: request.method(), headers: request.headers(), postData: request.postData() });
     }
   });
@@ -119,7 +119,7 @@ try {
   await page.locator('#previewOnline').click();
   await page.getByText(/Real ElevenLabs sample generated/i).waitFor({ timeout: 10000 });
   assert.equal(providerRequests.length, 2, 'ElevenLabs preview sends exactly one provider request');
-  assert.match(providerRequests[1].url, /api\\.elevenlabs\\.io\\/v1\\/text-to-speech\\/eleven-test-voice-id/, 'ElevenLabs preview uses the selected voice ID');
+  assert.match(providerRequests[1].url, /api\.elevenlabs\.io\/v1\/text-to-speech\/eleven-test-voice-id/, 'ElevenLabs preview uses the selected voice ID');
   assert.equal(providerRequests[1].headers['xi-api-key'], 'eleven-test-key', 'ElevenLabs preview sends the selected API key');
   assert.match(providerRequests[1].postData || '', /eleven_multilingual_v2/, 'ElevenLabs preview sends the selected model');
   assert.equal(await page.locator('#previewOnlineAudio').isVisible(), true, 'ElevenLabs sample audio player is shown');
