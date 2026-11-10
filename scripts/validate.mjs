@@ -37,6 +37,9 @@ assert(duplicates.length === 0, duplicates.length ? 'duplicate HTML ids: ' + dup
 assert(/<link\b[^>]*rel=["']manifest["'][^>]*>/i.test(html), 'web app manifest is linked');
 assert(/navigator\.serviceWorker\.register\(['"]\.\/service-worker\.js['"]/i.test(html), 'service worker registration is present');
 assert(manifest.name && manifest.short_name && manifest.start_url && manifest.scope, 'manifest has required app identity and URL fields');
+assert(manifest.icons.some(icon => icon.sizes === '192x192' && icon.type === 'image/png'), 'manifest includes a 192px PNG install icon');
+assert(manifest.icons.some(icon => icon.sizes === '512x512' && icon.type === 'image/png' && icon.purpose === 'any'), 'manifest includes a 512px PNG install icon');
+assert(manifest.icons.some(icon => icon.sizes === '512x512' && icon.type === 'image/png' && icon.purpose === 'maskable'), 'manifest includes a maskable 512px PNG icon');
 
 for (const icon of manifest.icons || []) {
   assert(existsSync(join(root, icon.src)), 'manifest icon exists: ' + icon.src);
