@@ -10,7 +10,9 @@ const SHELL_URLS = [
   new URL('./', self.location.href).href,
   new URL('./index.html', self.location.href).href,
   new URL('./manifest.webmanifest', self.location.href).href,
-  new URL('./icon.svg', self.location.href).href
+  new URL('./icon.svg', self.location.href).href,
+  new URL('./icons/icon-192.png', self.location.href).href,
+  new URL('./icons/icon-512.png', self.location.href).href
 ];
 const SHELL_SET = new Set(SHELL_URLS);
 
