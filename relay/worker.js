@@ -9,7 +9,8 @@
 
 const ALLOWED_ORIGIN = 'https://gracefulrosenailspa.github.io';
 const FISH_API = 'https://api.fish.audio';
-const MAX_BODY_BYTES = 1024 * 1024;
+const MAX_TTS_BODY_BYTES = 1024 * 1024;
+const MAX_CLONE_BODY_BYTES = 25 * 1024 * 1024;
 
 function corsHeaders() {
   return {
@@ -79,6 +80,7 @@ export default {
     const url = new URL(request.url);
     const isModelPath = url.pathname === '/model' || url.pathname.startsWith('/model/');
     const isTtsPath = url.pathname === '/v1/tts';
+    const isModelUpload = url.pathname === '/model' && request.method === 'POST';
 
     if (!isModelPath && !isTtsPath) {
       return response('Not found', 404, cors);
@@ -89,7 +91,7 @@ export default {
     }
 
     const allowedMethod = (isModelPath && request.method === 'GET') ||
-      (isTtsPath && request.method === 'POST');
+      isModelUpload || (isTtsPath && request.method === 'POST');
     if (!allowedMethod) {
       return response('Method not allowed', 405, cors);
     }
@@ -118,12 +120,13 @@ export default {
 
     let body;
     if (request.method === 'POST') {
+      const bodyLimit = isModelUpload ? MAX_CLONE_BODY_BYTES : MAX_TTS_BODY_BYTES;
       const declaredLength = Number(request.headers.get('Content-Length') || 0);
-      if (declaredLength > MAX_BODY_BYTES) {
+      if (declaredLength > bodyLimit) {
         return response('Request body is too large', 413, cors);
       }
       try {
-        body = await readLimitedBody(request.body, MAX_BODY_BYTES);
+        body = await readLimitedBody(request.body, bodyLimit);
       } catch (error) {
         if (error && error.message === 'BODY_TOO_LARGE') {
           return response('Request body is too large', 413, cors);
