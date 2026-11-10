@@ -60,7 +60,7 @@ function resolveRoute(pathname, method) {
   if (!pathname.startsWith('/elevenlabs/')) return null;
   const upstreamPath = pathname.slice('/elevenlabs'.length);
   const voiceList = method === 'GET' && (upstreamPath === '/v2/voices' || upstreamPath === '/v1/shared-voices');
-  const tts = method === 'POST' && /^\\/v1\\/text-to-speech\\/[A-Za-z0-9_-]+$/.test(upstreamPath);
+  const tts = method === 'POST' && /^\/v1\/text-to-speech\/[A-Za-z0-9_-]+$/.test(upstreamPath);
   const clone = method === 'POST' && upstreamPath === '/v1/voices/add';
   return voiceList || tts || clone ? { provider: 'eleven', upstreamPath, upload: clone } : null;
 }
@@ -74,7 +74,7 @@ export default {
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
 
     const credential = route.provider === 'fish' ? (request.headers.get('Authorization') || '') : (request.headers.get('xi-api-key') || '');
-    if (route.provider === 'fish' && !/^Bearer\\s+\\S+/i.test(credential)) return response('A Fish Audio bearer token is required', 401, cors);
+    if (route.provider === 'fish' && !/^Bearer\s+\S+/i.test(credential)) return response('A Fish Audio bearer token is required', 401, cors);
     if (route.provider === 'eleven' && !credential.trim()) return response('An ElevenLabs xi-api-key is required', 401, cors);
     if (!env || !env.RATE_LIMITER || typeof env.RATE_LIMITER.limit !== 'function') return response('Relay rate limiting is not configured', 503, cors);
     try {
