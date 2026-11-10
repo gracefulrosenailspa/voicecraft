@@ -30,20 +30,42 @@ page.on('pageerror', error => pageErrors.push(error.message));
 try {
   await page.addInitScript(dataUrl => {
     const makeAudio = () => { const audio = new Audio(); audio.src = dataUrl; return audio; };
-    window.puter = { ai: { txt2speech: async () => makeAudio(), speech2speech: async () => makeAudio() } };
+    window.__ttsCalls = [];
+    window.puter = { ai: { txt2speech: async (text, options) => { window.__ttsCalls.push({ text, options }); return makeAudio(); }, speech2speech: async () => makeAudio() } };
   }, wavData);
   await page.goto(origin, { waitUntil: 'domcontentloaded' });
   assert.equal(await page.title(), 'VoiceCraft Studio', 'the studio page loads');
   assert.equal(await page.locator('#script').count(), 1, 'the narration editor is present');
-  await page.locator('#script').fill('VoiceCraft browser smoke test.');
+  const installAssets = await page.evaluate(async () => {
+    const manifest = await (await fetch('./manifest.webmanifest')).json();
+    const icons = await Promise.all(manifest.icons.filter(icon => icon.type === 'image/png').map(icon => new Promise((resolve, reject) => {
+      const image = new Image(); image.onload = () => resolve({ sizes: icon.sizes, width: image.naturalWidth, height: image.naturalHeight });
+      image.onerror = reject; image.src = icon.src;
+    })));
+    return { manifest, icons };
+  });
+  assert.ok(installAssets.icons.some(icon => icon.sizes === '192x192' && icon.width === 192 && icon.height === 192), '192px PWA icon loads at the declared size');
+  assert.ok(installAssets.icons.some(icon => icon.sizes === '512x512' && icon.width === 512 && icon.height === 512), '512px PWA icon loads at the declared size');
+  console.log('PASS: PWA manifest and raster install icons load at their declared dimensions');
+
+  await page.locator('#cModel').selectOption('tts-1');
+  const restrictedVoices = await page.locator('#cVoice option').evaluateAll(options => options.map(option => option.value));
+  assert.ok(!restrictedVoices.some(voice => ['ballad', 'verse', 'marin', 'cedar'].includes(voice)), 'OpenAI legacy models do not offer voices restricted to gpt-4o-mini-tts');
+  await page.locator('#cModel').selectOption('gpt-4o-mini-tts');
+  const expressiveVoices = await page.locator('#cVoice option').evaluateAll(options => options.map(option => option.value));
+  assert.ok(['ballad', 'verse', 'marin', 'cedar'].every(voice => expressiveVoices.includes(voice)), 'gpt-4o-mini-tts exposes its supported expressive voices');
+  console.log('PASS: OpenAI voice choices follow the selected model');  await page.locator('#script').fill('VoiceCraft browser smoke test.');
   await page.waitForFunction(() => document.querySelector('#count')?.textContent.includes('30'), null, { timeout: 5000 });
   console.log('PASS: app loads and narration editor responds');
 
+  await page.evaluate(() => { const input = document.querySelector('#intensity'); input.value = '100'; input.dispatchEvent(new Event('input', { bubbles: true })); });
   await page.locator('#engineSeg button[data-engine="cloud"]').click();
   await page.locator('#play').click();
   await page.getByRole('button', { name: /complete narration/i }).waitFor({ state: 'visible', timeout: 10000 });
   await page.getByRole('button', { name: /complete narration/i }).click();
   await page.getByRole('link', { name: /download complete narration/i }).waitFor({ state: 'visible', timeout: 10000 });
+  const ttsOptions = await page.evaluate(() => window.__ttsCalls[0]?.options || {});
+  assert.match(ttsOptions.instructions || '', /strong, vivid emotional expression/i, 'cloud TTS receives the selected intensity');
   console.log('PASS: mocked Puter generation and combined WAV export');
 
   await page.locator('#tab-lab').click();
