@@ -60,11 +60,12 @@ try {
   assert.equal(await page.locator('#previewCloud').count(), 1, 'cloud voice audition control is available');
   assert.equal(await page.locator('#previewKeys').count(), 1, 'pro voice audition control is available');
   await page.locator('#previewCloud').click();
-  await page.locator('#previewCloudAudio').waitFor({ state: 'visible', timeout: 10000 });
-  const previewCall = await page.evaluate(() => window.__ttsCalls.at(-1));
-  assert.match(previewCall.text, /world does not change in a moment/i, 'voice audition uses the short preview script');
-  assert.equal(previewCall.options.voice, 'onyx', 'voice audition uses the currently selected cloud voice');
-  console.log('PASS: voice audition controls render and cloud preview uses the selected voice');  await page.locator('#script').fill('VoiceCraft browser smoke test.');
+  await page.waitForFunction(() => window.__speechPreviewCalls && window.__speechPreviewCalls.length === 1);
+  const freePreview = await page.evaluate(() => window.__speechPreviewCalls[0]);
+  assert.match(freePreview.text, /world does not change in a moment/i, 'free audition uses the short generic sample');
+  assert.equal(await page.locator('#previewCloudAudio').count(), 0, 'generic preview does not create provider audio');
+  assert.equal(await page.evaluate(() => window.__ttsCalls.length), 0, 'generic preview makes no paid provider TTS request');
+  console.log('PASS: generic voice audition uses device speech without provider credits');  await page.locator('#script').fill('VoiceCraft browser smoke test.');
   await page.waitForFunction(() => document.querySelector('#count')?.textContent.includes('30'), null, { timeout: 5000 });
   await page.setViewportSize({ width: 390, height: 844 });
   const mobileLayout = await page.evaluate(() => ({
