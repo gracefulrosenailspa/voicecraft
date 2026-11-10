@@ -378,7 +378,7 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
           <div class="field" id="kRelayField"><label for="kRelay">Cloudflare relay address, Fish Audio and ElevenLabs</label><input type="text" id="kRelay" autocomplete="off" spellcheck="false" placeholder="https://your-voicecraft-relay.workers.dev"><p class="note">Optional. Use your deployed VoiceCraft Cloudflare Worker address. It routes both providers through the same relay.</p></div>
           <p class="note" id="kNote"></p>
           <div class="voice-preview"><button class="btn" id="previewOnline" type="button">▶ Test actual online voice</button><p class="note" id="previewOnlineStatus" role="status" aria-live="polite">Uses Fish Audio or ElevenLabs to generate a short real sample. Provider usage or credits may apply. You will be asked before sending.</p><audio id="previewOnlineAudio" controls hidden></audio></div>
-          <p class="note">Your key stays in this browser and goes only to the service you pick. Anyone using this device with keys remembered could spend your credit.</p>
+          <p class="note">Your key is held in this browser by default. With a relay configured, it passes through your Cloudflare Worker and is forwarded to the provider you selected. The Worker does not store or log it. Anyone using this device with keys remembered could spend your credit.</p>
         </section>
 
         <section class="blk">
