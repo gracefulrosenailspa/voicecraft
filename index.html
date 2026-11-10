@@ -1300,6 +1300,8 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
     if (labExportUrl) { URL.revokeObjectURL(labExportUrl); labExportUrl = null; }
     labBuf = null;
     labFile = null;
+    $('rvConsent').checked = false;
+    $('cloneConsent').checked = false;
     $('labPlay').disabled = true;
     $('labExport').disabled = true;
     $('rvGo').disabled = true;
