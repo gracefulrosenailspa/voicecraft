@@ -1275,8 +1275,11 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
     if (priorDownload) priorDownload.remove();
     if (labExportUrl) { URL.revokeObjectURL(labExportUrl); labExportUrl = null; }
     labBuf = null;
+    labFile = null;
     $('labPlay').disabled = true;
     $('labExport').disabled = true;
+    $('rvGo').disabled = true;
+    $('cloneGo').disabled = true;
     labStatus('Reading ' + f.name + '…');
     try {
       var ab = await f.arrayBuffer();
@@ -1346,10 +1349,12 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
   }
   async function labPlay() {
     if (!labBuf) return;
+    var playLoad = labLoadSeq, playBuffer = labBuf;
     labStop();
     var c = audioCtx();
     try { await c.resume(); } catch (e) { /* resume refused */ }
-    var src = c.createBufferSource(); src.buffer = labBuf;
+    if (playLoad !== labLoadSeq || labBuf !== playBuffer) return;
+    var src = c.createBufferSource(); src.buffer = playBuffer;
     var low = c.createBiquadFilter(); low.type = 'lowshelf'; low.frequency.value = 180;
     var comp = c.createDynamicsCompressor(); comp.threshold.value = -24; comp.ratio.value = 3;
     var dry = c.createGain(), wet = c.createGain(), master = c.createGain(); master.gain.value = 0.9;
@@ -1510,14 +1515,16 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
   }
   async function rvConvert() {
     if (!STANDALONE) { rvStatus('Re-voice needs the standalone file.'); return; }
+    var sourceFile = labFile;
+    if (!sourceFile) { rvStatus('Load a recording above first.'); return; }
+    $('rvGo').disabled = true;
     rvStatus('Loading Puter…');
     try { await ensurePuter(); } catch (e) { /* handled below */ }
+    if (sourceFile !== labFile) { rvStatus('The selected recording changed. Please try again.'); $('rvGo').disabled = !labFile; return; }
     if (!window.puter || !window.puter.ai || !window.puter.ai.speech2speech) {
       rvStatus('Puter did not load. Check your connection and refresh the page.');
       return;
     }
-    if (!labFile) { rvStatus('Load a recording above first.'); return; }
-    $('rvGo').disabled = true;
     $('rvOut').textContent = '';
     rvStatus('Converting. Puter may ask you to sign in.');
     try {
