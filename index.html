@@ -424,6 +424,7 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
         <div class="transport">
           <button class="btn primary" id="labPlay" type="button" disabled>Play with effects</button>
           <button class="btn" id="labStop" type="button" disabled>Stop</button>
+          <button class="btn" id="labExport" type="button" disabled>Export processed WAV</button>
           <span class="meta mono" id="labInfo"></span>
         </div>
         <p class="status mono" id="labStatus" role="status" aria-live="polite">Load a recording to begin.</p>
@@ -1279,12 +1280,15 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
       $('dropTitle').textContent = f.name;
       $('dropSub').textContent = fmt(buf.duration) + ' · tap to choose another';
       $('labPlay').disabled = false;
+      $('labExport').disabled = false;
+      var priorDownload = $('labDownload'); if (priorDownload) priorDownload.remove();
       labLabels(); drawWave();
       labStatus('Loaded. Press Play and move the sliders while it runs.');
     } catch (err) {
       labBuf = null;
       labFile = f;
       $('labPlay').disabled = true;
+      $('labExport').disabled = true;
       $('rvGo').disabled = !STANDALONE;
       $('cloneGo').disabled = !STANDALONE;
       drawWave();
@@ -1351,6 +1355,75 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
     labStatus('Playing. Adjust the sliders while it runs.');
     labTick();
   }
+  var labExportUrl = null;
+  function exportWavBuffer(buffer, filename) {
+    var channels = Math.min(2, buffer.numberOfChannels), frames = buffer.length;
+    var bytes = frames * channels * 2;
+    if (bytes > 180 * 1024 * 1024) throw new Error('This recording is too large to export reliably in this browser.');
+    var out = new ArrayBuffer(44 + bytes), view = new DataView(out);
+    function tag(pos, value) { for (var i = 0; i < value.length; i++) view.setUint8(pos + i, value.charCodeAt(i)); }
+    tag(0, 'RIFF'); view.setUint32(4, 36 + bytes, true); tag(8, 'WAVE');
+    tag(12, 'fmt '); view.setUint32(16, 16, true); view.setUint16(20, 1, true);
+    view.setUint16(22, channels, true); view.setUint32(24, buffer.sampleRate, true);
+    view.setUint32(28, buffer.sampleRate * channels * 2, true); view.setUint16(32, channels * 2, true);
+    view.setUint16(34, 16, true); tag(36, 'data'); view.setUint32(40, bytes, true);
+    var offset = 44, channelData = [];
+    for (var ch = 0; ch < channels; ch++) channelData.push(buffer.getChannelData(ch));
+    for (var frame = 0; frame < frames; frame++) {
+      for (var c = 0; c < channels; c++) {
+        var sample = Math.max(-1, Math.min(1, channelData[c][frame]));
+        view.setInt16(offset, sample < 0 ? sample * 32768 : sample * 32767, true);
+        offset += 2;
+      }
+    }
+    if (labExportUrl) URL.revokeObjectURL(labExportUrl);
+    labExportUrl = URL.createObjectURL(new Blob([out], { type: 'audio/wav' }));
+    var link = document.createElement('a');
+    link.href = labExportUrl; link.download = filename;
+    link.textContent = 'Download processed recording (WAV)';
+    link.className = 'btn primary'; link.style.marginTop = '10px';
+    var old = $('labDownload'); if (old) old.remove();
+    link.id = 'labDownload';
+    $('labStatus').insertAdjacentElement('afterend', link);
+  }
+  async function exportLabWav() {
+    if (!labBuf) return;
+    var button = $('labExport'), v = labValues();
+    button.disabled = true; button.textContent = 'Rendering effects…';
+    labStatus('Rendering the processed recording. Keep this tab open…');
+    try {
+      var Offline = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+      if (!Offline) throw new Error('This browser does not support offline audio rendering.');
+      var rate = Math.pow(2, v.depth / 12);
+      var renderRate = labBuf.sampleRate;
+      var tail = 1.8;
+      var frames = Math.ceil((labBuf.duration / rate + tail) * renderRate);
+      var bytes = frames * 2 * 2;
+      if (bytes > 180 * 1024 * 1024) throw new Error('The processed WAV would be too large for reliable browser export. Try a shorter recording.');
+      var offline = new Offline(2, frames, renderRate);
+      var src = offline.createBufferSource(); src.buffer = labBuf;
+      var low = offline.createBiquadFilter(); low.type = 'lowshelf'; low.frequency.value = 180; low.gain.value = v.warmth;
+      var comp = offline.createDynamicsCompressor(); comp.threshold.value = -24; comp.ratio.value = 3;
+      var dry = offline.createGain(), wet = offline.createGain(), master = offline.createGain();
+      master.gain.value = 0.9;
+      var conv = offline.createConvolver(); conv.buffer = impulse(offline, tail, 3);
+      src.playbackRate.value = rate;
+      wet.gain.value = v.room / 100; dry.gain.value = 1 - (v.room / 100) * 0.5;
+      src.connect(low); low.connect(comp);
+      comp.connect(dry); dry.connect(master);
+      comp.connect(conv); conv.connect(wet); wet.connect(master);
+      master.connect(offline.destination);
+      src.start(0);
+      var rendered = await offline.startRendering();
+      exportWavBuffer(rendered, 'voicecraft-processed-recording.wav');
+      labStatus('Processed WAV is ready. Download it below.');
+    } catch (err) {
+      labStatus('Export failed: ' + (err && err.message ? err.message : String(err)));
+    } finally {
+      button.disabled = !labBuf;
+      button.textContent = 'Export processed WAV';
+    }
+  }
   function labStop() {
     if (labSrc) {
       var s = labSrc; labSrc = null; labNodes = null;
@@ -1363,6 +1436,7 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
   }
   $('labPlay').addEventListener('click', labPlay);
   $('labStop').addEventListener('click', function () { labStop(); labStatus('Stopped.'); });
+  $('labExport').addEventListener('click', exportLabWav);
   ['depth', 'warmth', 'room'].forEach(function (id) {
     $(id).addEventListener('input', function () {
       document.querySelectorAll('#labPresets .chip').forEach(function (b) { b.setAttribute('aria-pressed', 'false'); });
