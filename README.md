@@ -19,14 +19,14 @@ The front end is plain HTML, CSS and JavaScript.
 
 1. Serve the repository root from a static web host, or use GitHub Pages.
 2. Use HTTPS. Service workers and browser audio APIs require a secure context, except for localhost development.
-3. Keep index.html, manifest.webmanifest, icon.svg and service-worker.js together at the deployed app root.
+3. Keep index.html, manifest.webmanifest, icon.svg, service-worker.js and the icons directory together at the deployed app root.
 4. Do not deploy relay/worker.js as part of the static site. It is a separate Cloudflare Worker.
 
 For GitHub Pages, enable deployment from the intended branch and root folder in the repository's Pages settings. The app uses relative paths so it can live under a project path such as /voicecraft/.
 
 ## Offline and install behavior
 
-The service worker caches only the app shell: the home page, HTML entry point, web manifest and icon. It does not cache generated audio, uploaded recordings, scripts, API keys, relay traffic or provider responses.
+The service worker caches only the app shell: the home page, HTML entry point, web manifest and app icons. It does not cache generated audio, uploaded recordings, scripts, API keys, relay traffic or provider responses.
 
 Offline access means the interface can reopen after it has been cached. Cloud speech generation, voice lists, cloning, re-voice and provider downloads still need an internet connection. The Puter SDK and other remote resources may also be unavailable offline.
 
@@ -67,7 +67,7 @@ To run the browser smoke suite locally, install Playwright and Chromium, start a
     python3 -m http.server 4173 --bind 127.0.0.1
     node scripts/browser-smoke.mjs
 
-The browser suite checks app startup, narration editing, mocked Puter generation and combined WAV export, Voice Lab decode and processed WAV export, mocked re-voice, stale-download cleanup and offline app-shell reopening. Provider calls are mocked; this does not verify real account access or billing.
+The browser suite checks app startup, narration editing, mocked Puter generation and combined WAV export, Voice Lab decode and processed WAV export, mocked re-voice, stale-download cleanup, mobile viewport layout and offline app-shell reopening. Provider calls are mocked; this does not verify real account access or billing.
 
 GitHub Actions runs static checks, relay security tests and browser smoke tests on pushes to main and on pull requests targeting main.
 
