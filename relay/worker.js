@@ -78,7 +78,14 @@ export default {
     if (!ALLOWED_ORIGINS.has(origin)) return response('Forbidden: website origin is not allowed', 403, corsHeaders('null'));
     const cors = corsHeaders(origin), url = new URL(request.url);
     const route = resolveRoute(url.pathname, request.method);
-    if (!route) {\n      const elevenPath = url.pathname === '/elevenlabs/v2/voices' || url.pathname === '/elevenlabs/v1/shared-voices' || /^\\/elevenlabs\\/v1\\/text-to-speech\\/[A-Za-z0-9_-]+$/.test(url.pathname) || url.pathname === '/elevenlabs/v1/voices/add';\n      const knownPath = url.pathname === '/model' || url.pathname.startsWith('/model/') || url.pathname === '/v1/tts' || elevenPath;\n      return response(knownPath ? 'Method not allowed' : 'Not found', knownPath ? 405 : 404, cors);\n    }
+    if (!route) {
+      const elevenPath = url.pathname === '/elevenlabs/v2/voices' ||
+        url.pathname === '/elevenlabs/v1/shared-voices' ||
+        /^\/elevenlabs\/v1\/text-to-speech\/[A-Za-z0-9_-]+$/.test(url.pathname) ||
+        url.pathname === '/elevenlabs/v1/voices/add';
+      const knownPath = url.pathname === '/model' || url.pathname.startsWith('/model/') || url.pathname === '/v1/tts' || elevenPath;
+      return response(knownPath ? 'Method not allowed' : 'Not found', knownPath ? 405 : 404, cors);
+    }
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
 
     const credential = route.provider === 'fish' ? (request.headers.get('Authorization') || '') : (request.headers.get('xi-api-key') || '');
