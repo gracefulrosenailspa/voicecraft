@@ -870,8 +870,8 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
   function stop() {
     if (S.engine !== 'device') {
       cloudCancel = true;
-      if (kAbort) kAbort.abort();
-      setStatus('Stopping.');
+      if (kAbort) { kAbort.abort(); setStatus('Cancelling the current provider request…'); }
+      else setStatus('Will stop after the current cloud section finishes.');
       return;
     }
     sid++;
@@ -1218,6 +1218,7 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
         var audio = await window.puter.ai.txt2speech(r.text, r.options);
         if (!audio || !audio.src) throw new Error('The provider returned no playable audio.');
         addCard(audio, i, chunks.length);
+        if (cloudCancel) { done++; break; }
         try { var audioResponse = await fetch(audio.src); if (!audioResponse.ok) throw new Error('Audio download unavailable'); completeBlobs.push(await audioResponse.blob()); }
         catch (downloadErr) { completeBlobs = []; }
         done++;
