@@ -1267,7 +1267,9 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
     if (mq.addEventListener) mq.addEventListener('change', function () { setTimeout(drawWave, 50); });
   }
 
+  var labLoadSeq = 0;
   async function loadFile(f) {
+    var loadId = ++labLoadSeq;
     labStop();
     var priorDownload = $('labDownload');
     if (priorDownload) priorDownload.remove();
@@ -1279,6 +1281,7 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
     try {
       var ab = await f.arrayBuffer();
       var buf = await audioCtx().decodeAudioData(ab);
+      if (loadId !== labLoadSeq) return;
       labBuf = buf;
       labFile = f;
       $('rvGo').disabled = !STANDALONE;
@@ -1290,6 +1293,7 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
       labLabels(); drawWave();
       labStatus('Loaded. Press Play and move the sliders while it runs.');
     } catch (err) {
+      if (loadId !== labLoadSeq) return;
       labBuf = null;
       labFile = f;
       $('labPlay').disabled = true;
@@ -1398,6 +1402,7 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
   }
   async function exportLabWav() {
     if (!labBuf) return;
+    var sourceBuffer = labBuf, sourceLoad = labLoadSeq;
     var button = $('labExport'), v = labValues();
     button.disabled = true; button.textContent = 'Rendering effects…';
     labStatus('Rendering the processed recording. Keep this tab open…');
@@ -1425,6 +1430,7 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
       master.connect(offline.destination);
       src.start(0);
       var rendered = await offline.startRendering();
+      if (sourceLoad !== labLoadSeq || labBuf !== sourceBuffer) return;
       exportWavBuffer(rendered, 'voicecraft-processed-recording.wav');
       labStatus('Processed WAV is ready. Download it below.');
     } catch (err) {
