@@ -10,6 +10,7 @@ A browser-based text-to-speech and voice-processing studio. The front end is a s
 - **Fish Audio and ElevenLabs:** use your own provider API key to select voices and generate narration.
 - **Voice Lab:** load an audio recording, preview depth, warmth and room effects, export a processed WAV, or send the recording to a supported voice-cloning / re-voice provider.
 - **Downloads:** download generated sections individually and, when provider audio can be fetched by the browser, export a combined narration WAV.
+- **WAV safety:** combined narration and Voice Lab exports are limited to 32 MiB to reduce mobile browser memory pressure. For longer output, download generated sections individually.
 
 ## Run and deploy
 
