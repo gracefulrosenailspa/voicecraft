@@ -47,6 +47,10 @@ assert(/request\.method\s*!==\s*['"]GET['"]/.test(worker), 'service worker does 
 assert(/url\.origin\s*!==\s*self\.location\.origin/.test(worker), 'service worker excludes cross-origin provider/API requests');
 assert(/SHELL_SET\.has/.test(worker), 'service worker only handles its explicit app-shell allowlist');
 assert(/serviceWorker/.test(html) && /cloud generation needs internet/i.test(worker), 'offline limitations are documented in code');
+assert(/availableVoices\s*=\s*c\.voices\.filter/.test(html), 'OpenAI voices are filtered by selected model');
+assert(/labLoadSeq/.test(html), 'Voice Lab rejects stale file-load and export results');
+assert(/maxWavBytes\s*=\s*32\s*\*\s*1024\s*\*\s*1024/.test(html), 'combined WAV export has a mobile memory limit');
+assert(/voice_settings\s*=\s*\{\s*stability:/.test(html), 'cloud ElevenLabs receives supported voice tuning settings');
 
 for (const id of ['labExport', 'labPlay', 'cloneGo', 'rvGo']) {
   assert(ids.includes(id), 'critical Voice Lab control exists: ' + id);
