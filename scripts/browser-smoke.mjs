@@ -31,6 +31,13 @@ try {
   await page.addInitScript(dataUrl => {
     const makeAudio = () => { const audio = new Audio(); audio.src = dataUrl; return audio; };
     window.__ttsCalls = [];
+    window.__speechPreviewCalls = [];
+    window.SpeechSynthesisUtterance = class { constructor(text) { this.text = text; } };
+    Object.defineProperty(window, 'speechSynthesis', { configurable: true, value: {
+      cancel() {},
+      getVoices() { return [{ name: 'Test device voice', lang: 'en-US', voiceURI: 'test' }]; },
+      speak(utterance) { window.__speechPreviewCalls.push({ text: utterance.text }); if (utterance.onstart) utterance.onstart(); if (utterance.onend) utterance.onend(); }
+    }});
     window.puter = { ai: { txt2speech: async (text, options) => { window.__ttsCalls.push({ text, options }); return makeAudio(); }, speech2speech: async () => makeAudio() } };
   }, wavData);
   await page.goto(origin, { waitUntil: 'domcontentloaded' });
@@ -55,7 +62,17 @@ try {
   await page.locator('#cModel').selectOption('gpt-4o-mini-tts');
   const expressiveVoices = await page.locator('#cVoice option').evaluateAll(options => options.map(option => option.value));
   assert.ok(['ballad', 'verse', 'marin', 'cedar'].every(voice => expressiveVoices.includes(voice)), 'gpt-4o-mini-tts exposes its supported expressive voices');
-  console.log('PASS: OpenAI voice choices follow the selected model');  await page.locator('#script').fill('VoiceCraft browser smoke test.');
+  console.log('PASS: OpenAI voice choices follow the selected model');
+  assert.equal(await page.locator('#previewDevice').count(), 1, 'device voice audition control is available');
+  assert.equal(await page.locator('#previewCloud').count(), 1, 'cloud voice audition control is available');
+  assert.equal(await page.locator('#previewKeys').count(), 1, 'pro voice audition control is available');
+  await page.locator('#previewCloud').click();
+  await page.waitForFunction(() => window.__speechPreviewCalls && window.__speechPreviewCalls.length === 1);
+  const freePreview = await page.evaluate(() => window.__speechPreviewCalls[0]);
+  assert.match(freePreview.text, /world does not change in a moment/i, 'free audition uses the short generic sample');
+  assert.equal(await page.locator('#previewCloudAudio').count(), 0, 'generic preview does not create provider audio');
+  assert.equal(await page.evaluate(() => window.__ttsCalls.length), 0, 'generic preview makes no paid provider TTS request');
+  console.log('PASS: generic voice audition uses device speech without provider credits');  await page.locator('#script').fill('VoiceCraft browser smoke test.');
   await page.waitForFunction(() => document.querySelector('#count')?.textContent.includes('30'), null, { timeout: 5000 });
   await page.setViewportSize({ width: 390, height: 844 });
   const mobileLayout = await page.evaluate(() => ({
