@@ -39,6 +39,7 @@ When changing shell assets, increment CACHE_NAME in service-worker.js so clients
 - Narration scripts and app settings are saved in the current browser's local storage.
 - Provider keys are held in page memory by default. If Remember keys on this device is enabled, keys are stored in that browser's local storage. Local storage is not encrypted. Do not enable key remembering on a shared or untrusted device.
 - The app sends a provider key to the provider selected by the user. For Fish Audio, requests may be routed through the user's configured relay.
+- Fish Audio voice cloning can also use the configured relay. The relay accepts clone uploads up to 25 MiB; larger recordings are rejected before they are forwarded.
 - Voice Lab cloning and re-voice upload the selected recording to the chosen provider. Only upload voices you own or have permission to use, and review the provider's retention and privacy terms.
 - Clearing browser site data removes locally saved scripts, settings and remembered keys.
 
