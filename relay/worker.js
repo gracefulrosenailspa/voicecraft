@@ -64,9 +64,7 @@ function resolveRoute(pathname, method) {
   const voiceList = upstreamPath === '/v2/voices' || upstreamPath === '/v1/shared-voices';
   const tts = /^\/v1\/text-to-speech\/[A-Za-z0-9_-]+$/.test(upstreamPath);
   const clone = upstreamPath === '/v1/voices/add';
-  if (method === 'OPTIONS' && (voiceList || tts || clone)) {
-    return { provider: 'eleven', upstreamPath, upload: false };
-  }
+  if (method === 'OPTIONS' && (voiceList || tts || clone)) return { provider: 'eleven', upstreamPath, upload: false };
   if (method === 'GET' && voiceList) return { provider: 'eleven', upstreamPath, upload: false };
   if (method === 'POST' && tts) return { provider: 'eleven', upstreamPath, upload: false };
   if (method === 'POST' && clone) return { provider: 'eleven', upstreamPath, upload: true };
