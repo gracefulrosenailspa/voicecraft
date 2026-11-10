@@ -38,18 +38,18 @@ When changing shell assets, increment CACHE_NAME in service-worker.js so clients
 
 - Narration scripts and app settings are saved in the current browser's local storage.
 - Provider keys are held in page memory by default. If Remember keys on this device is enabled, keys are stored in that browser's local storage. Local storage is not encrypted. Do not enable key remembering on a shared or untrusted device.
-- The app sends a provider key to the provider selected by the user. For Fish Audio, requests may be routed through the user's configured relay.
+- The app sends a provider key to the provider selected by the user. Fish Audio and ElevenLabs requests can be routed through the user's configured Cloudflare Worker relay.
 - Fish Audio voice cloning can also use the configured relay. The relay accepts clone uploads up to 25 MiB; larger recordings are rejected before they are forwarded.
 - Voice Lab cloning and re-voice upload the selected recording to the chosen provider. Only upload voices you own or have permission to use, and review the provider's retention and privacy terms.
 - Clearing browser site data removes locally saved scripts, settings and remembered keys.
 
-## Fish Audio relay
+## Cloudflare provider relay
 
-The optional relay is a separate Cloudflare Worker in relay/worker.js. It is not ready for production until the required RATE_LIMITER binding is configured.
+The optional shared relay is a separate Cloudflare Worker in relay/worker.js. It supports Fish Audio and ElevenLabs and is not ready for production until the required RATE_LIMITER binding is configured.
 
-Read relay/README.md before deploying. The Worker intentionally returns HTTP 503 if the binding is missing. Do not remove the fail-closed behavior to make an unconfigured relay appear functional.
+Read relay/README.md before deploying. Paste the deployed Worker base URL into the Cloudflare relay address field in Pro voices to route both providers through it. The Worker intentionally returns HTTP 503 if the binding is missing. Do not remove the fail-closed behavior to make an unconfigured relay appear functional.
 
-The current relay allows browser requests from the VoiceCraft GitHub Pages origin. If the front end moves to another domain, update the allow-listed origin in the Worker and review the CORS policy before deployment.
+The relay allows browser requests from the VoiceCraft GitHub Pages and AppDeploy preview origins. If the front end moves to another domain, update the allow-listed origins in the Worker and review the CORS policy before deployment.
 
 ## Developer checks
 
