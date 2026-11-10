@@ -75,6 +75,16 @@ try {
   await page.getByRole('button', { name: /complete narration/i }).waitFor({ state: 'visible', timeout: 10000 });
   await page.getByRole('button', { name: /complete narration/i }).click();
   await page.getByRole('link', { name: /download complete narration/i }).waitFor({ state: 'visible', timeout: 10000 });
+  const combinedWav = await page.getByRole('link', { name: /download complete narration/i }).evaluate(async link => {
+    const bytes = await (await fetch(link.href)).arrayBuffer();
+    const view = new DataView(bytes);
+    return { size: bytes.byteLength, riff: String.fromCharCode(...new Uint8Array(bytes, 0, 4)),
+      wave: String.fromCharCode(...new Uint8Array(bytes, 8, 4)), bits: view.getUint16(34, true) };
+  });
+  assert.equal(combinedWav.riff, 'RIFF', 'combined export has a RIFF header');
+  assert.equal(combinedWav.wave, 'WAVE', 'combined export has a WAVE format marker');
+  assert.equal(combinedWav.bits, 16, 'combined export is 16-bit PCM');
+  assert.ok(combinedWav.size > 44, 'combined export contains audio samples');
   const ttsOptions = await page.evaluate(() => window.__ttsCalls[0]?.options || {});
   assert.match(ttsOptions.instructions || '', /strong, vivid emotional expression/i, 'cloud TTS receives the selected intensity');
   console.log('PASS: mocked Puter generation and combined WAV export');
@@ -85,6 +95,16 @@ try {
   assert.equal(await page.locator('#labPlay').isEnabled(), true, 'Voice Lab playback is enabled after decoding');
   await page.locator('#labExport').click();
   await page.locator('#labDownload').waitFor({ state: 'visible', timeout: 15000 });
+  const processedWav = await page.locator('#labDownload').evaluate(async link => {
+    const bytes = await (await fetch(link.href)).arrayBuffer();
+    const view = new DataView(bytes);
+    return { size: bytes.byteLength, riff: String.fromCharCode(...new Uint8Array(bytes, 0, 4)),
+      wave: String.fromCharCode(...new Uint8Array(bytes, 8, 4)), bits: view.getUint16(34, true) };
+  });
+  assert.equal(processedWav.riff, 'RIFF', 'processed export has a RIFF header');
+  assert.equal(processedWav.wave, 'WAVE', 'processed export has a WAVE format marker');
+  assert.equal(processedWav.bits, 16, 'processed export is 16-bit PCM');
+  assert.ok(processedWav.size > 44, 'processed export contains audio samples');
   console.log('PASS: Voice Lab decodes audio and exports processed WAV');
 
   await page.locator('#rvGo').click();
