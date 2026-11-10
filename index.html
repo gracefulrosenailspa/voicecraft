@@ -437,7 +437,8 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
       </div>
       <div class="card" style="display:grid;gap:14px" id="revoiceCard">
         <h2>Re-voice with a cloud voice</h2>
-        <p class="note" id="revoiceNote">Converts the recording you loaded above into a different voice and keeps your timing and delivery. The result is a preset voice speaking your performance, not a copy of your own voice.</p>
+        <p class="note" id="revoiceNote">Converts the recording you loaded above into a different voice and keeps your timing and delivery. Your audio is sent to Puter for processing. The result is a preset voice speaking your performance, not a copy of your own voice.</p>
+        <label class="check" for="rvConsent"><input type="checkbox" id="rvConsent"> I own this recording or have permission to process the speaker's voice.</label>
         <div class="field">
           <label for="rvVoice">Target voice <output id="rvCount"></output></label>
           <select id="rvVoice" disabled></select>
@@ -1540,6 +1541,7 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
     if (!STANDALONE) { rvStatus('Re-voice needs the standalone file.'); return; }
     var sourceFile = labFile, sourceLoad = labLoadSeq;
     if (!sourceFile) { rvStatus('Load a recording above first.'); return; }
+    if (!$('rvConsent').checked) { rvStatus('Confirm that you own this recording or have permission to process the speaker.'); return; }
     $('rvGo').disabled = true;
     $('rvOut').textContent = '';
     try {
