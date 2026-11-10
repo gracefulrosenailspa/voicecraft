@@ -1316,7 +1316,7 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
     var len = Math.floor(c.sampleRate * secs), b = c.createBuffer(2, len, c.sampleRate);
     for (var ch = 0; ch < 2; ch++) {
       var d = b.getChannelData(ch);
-      var state = 2463534242;
+      var state = (2463534242 + ch * 1013904223) >>> 0;
       for (var i = 0; i < len; i++) {
         state ^= state << 13; state ^= state >>> 17; state ^= state << 5;
         var noise = (state >>> 0) / 4294967295 * 2 - 1;
