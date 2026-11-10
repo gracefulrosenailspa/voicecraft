@@ -79,16 +79,16 @@ try {
   // Verify real-provider audition wiring with mocked network responses only.
   const providerRequests = [];
   page.on('request', request => {
-    if (/api\.fish\.audio|api\.elevenlabs\.io/.test(request.url())) {
+    if (request.method() === 'POST' && /api\.fish\.audio|api\.elevenlabs\.io/.test(request.url())) {
       providerRequests.push({ url: request.url(), method: request.method(), headers: request.headers(), postData: request.postData() });
     }
   });
-  await page.route('https://api.fish.audio/v1/tts', route => route.fulfill({
-    status: 200, contentType: 'audio/mpeg', headers: { 'Access-Control-Allow-Origin': '*' }, body: Buffer.from([0x49, 0x44, 0x33, 0x04])
-  }));
-  await page.route('https://api.elevenlabs.io/v1/text-to-speech/**', route => route.fulfill({
-    status: 200, contentType: 'audio/mpeg', headers: { 'Access-Control-Allow-Origin': '*' }, body: Buffer.from([0x49, 0x44, 0x33, 0x04])
-  }));
+  await page.route('https://api.fish.audio/v1/tts', route => route.request().method() === 'OPTIONS'
+    ? route.fulfill({ status: 204, headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'POST, OPTIONS', 'Access-Control-Allow-Headers': 'authorization, content-type, model' } })
+    : route.fulfill({ status: 200, contentType: 'audio/mpeg', headers: { 'Access-Control-Allow-Origin': '*' }, body: Buffer.from([0x49, 0x44, 0x33, 0x04]) }));
+  await page.route('https://api.elevenlabs.io/v1/text-to-speech/**', route => route.request().method() === 'OPTIONS'
+    ? route.fulfill({ status: 204, headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'POST, OPTIONS', 'Access-Control-Allow-Headers': 'xi-api-key, content-type' } })
+    : route.fulfill({ status: 200, contentType: 'audio/mpeg', headers: { 'Access-Control-Allow-Origin': '*' }, body: Buffer.from([0x49, 0x44, 0x33, 0x04]) }));
   await page.locator('#engineSeg button[data-engine="keys"]').click();
   assert.equal(await page.locator('#keysVoice').isVisible(), true, 'Pro provider controls appear when Pro keys engine is selected');
   await page.locator('#previewOnline').click();
