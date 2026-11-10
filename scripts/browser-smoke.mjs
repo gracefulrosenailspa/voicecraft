@@ -48,6 +48,7 @@ try {
   assert.ok(installAssets.icons.some(icon => icon.sizes === '512x512' && icon.width === 512 && icon.height === 512), '512px PWA icon loads at the declared size');
   console.log('PASS: PWA manifest and raster install icons load at their declared dimensions');
 
+  await page.locator('#engineSeg button[data-engine="cloud"]').click();
   await page.locator('#cModel').selectOption('tts-1');
   const restrictedVoices = await page.locator('#cVoice option').evaluateAll(options => options.map(option => option.value));
   assert.ok(!restrictedVoices.some(voice => ['ballad', 'verse', 'marin', 'cedar'].includes(voice)), 'OpenAI legacy models do not offer voices restricted to gpt-4o-mini-tts');
@@ -59,7 +60,6 @@ try {
   console.log('PASS: app loads and narration editor responds');
 
   await page.evaluate(() => { const input = document.querySelector('#intensity'); input.value = '100'; input.dispatchEvent(new Event('input', { bubbles: true })); });
-  await page.locator('#engineSeg button[data-engine="cloud"]').click();
   await page.locator('#play').click();
   await page.getByRole('button', { name: /complete narration/i }).waitFor({ state: 'visible', timeout: 10000 });
   await page.getByRole('button', { name: /complete narration/i }).click();
