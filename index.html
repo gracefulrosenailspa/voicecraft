@@ -1108,17 +1108,20 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
       setStatus('Combining audio sections. Keep this tab open…');
       try {
         var ctx = audioCtx(), decoded = [], totalFrames = 0, channels = 1, rate = ctx.sampleRate;
+        var gapFrames = Math.round(rate * 0.18), maxWavBytes = 32 * 1024 * 1024;
         for (var i = 0; i < blobs.length; i++) {
           var ab = await blobs[i].arrayBuffer();
           var audio = await ctx.decodeAudioData(ab.slice(0));
           decoded.push(audio);
           totalFrames += audio.length;
           channels = Math.max(channels, Math.min(2, audio.numberOfChannels));
+          var projectedFrames = totalFrames + gapFrames * Math.max(0, decoded.length - 1);
+          if (projectedFrames * channels * 2 > maxWavBytes) {
+            throw new Error('The combined WAV would be too large for reliable browser export. Download the sections individually.');
+          }
         }
-        var gapFrames = Math.round(rate * 0.18);
         totalFrames += gapFrames * Math.max(0, decoded.length - 1);
         var dataBytes = totalFrames * channels * 2;
-        if (dataBytes > 180 * 1024 * 1024) throw new Error('The combined WAV would be too large for reliable browser export. Download the sections individually.');
         var wav = new ArrayBuffer(44 + dataBytes), view = new DataView(wav);
         function writeText(offset, value) { for (var j = 0; j < value.length; j++) view.setUint8(offset + j, value.charCodeAt(j)); }
         writeText(0, 'RIFF'); view.setUint32(4, 36 + dataBytes, true); writeText(8, 'WAVE');
@@ -1384,7 +1387,7 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
   function exportWavBuffer(buffer, filename) {
     var channels = Math.min(2, buffer.numberOfChannels), frames = buffer.length;
     var bytes = frames * channels * 2;
-    if (bytes > 180 * 1024 * 1024) throw new Error('This recording is too large to export reliably in this browser.');
+    if (bytes > 32 * 1024 * 1024) throw new Error('This recording is too large to export reliably in this browser. Try a shorter recording.');
     var out = new ArrayBuffer(44 + bytes), view = new DataView(out);
     function tag(pos, value) { for (var i = 0; i < value.length; i++) view.setUint8(pos + i, value.charCodeAt(i)); }
     tag(0, 'RIFF'); view.setUint32(4, 36 + bytes, true); tag(8, 'WAVE');
@@ -1425,7 +1428,7 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
       var tail = 1.8;
       var frames = Math.ceil((labBuf.duration / rate + tail) * renderRate);
       var bytes = frames * 2 * 2;
-      if (bytes > 180 * 1024 * 1024) throw new Error('The processed WAV would be too large for reliable browser export. Try a shorter recording.');
+      if (bytes > 32 * 1024 * 1024) throw new Error('The processed WAV would be too large for reliable browser export. Try a shorter recording.');
       var offline = new Offline(2, frames, renderRate);
       var src = offline.createBufferSource(); src.buffer = labBuf;
       var low = offline.createBiquadFilter(); low.type = 'lowshelf'; low.frequency.value = 180; low.gain.value = v.warmth;
