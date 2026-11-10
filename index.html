@@ -399,7 +399,7 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
     <div class="lab">
       <div class="card" style="display:grid;gap:14px">
         <h2>Make a recording deeper</h2>
-        <p class="note">Load a voice recording and reshape it: lower the pitch, add chest warmth, and place it in a room. Everything runs on this device. Your file is not uploaded anywhere.</p>
+        <p class="note">Load a voice recording and reshape it: lower the pitch, add chest warmth, and place it in a room. Preview and WAV processing run on this device. Re-voice and voice cloning upload your recording to the provider you choose.</p>
         <label class="drop" id="drop" for="file">
           <strong id="dropTitle">Choose a recording or drop it here</strong>
           <span class="note" id="dropSub">MP3, WAV, M4A or OGG</span>
@@ -458,6 +458,7 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
         <div class="field"><label for="cloneName">Voice name</label><input type="text" id="cloneName" value="My voice"></div>
         <label class="check" for="cloneConsent"><input type="checkbox" id="cloneConsent"> This is my own voice, or the speaker has given me permission.</label>
         <div class="transport"><button class="btn primary" id="cloneGo" type="button" disabled>Create cloned voice</button></div>
+        <p class="note">Creating a clone uploads this recording to the selected provider. Fish Audio relay uploads are limited to 25 MiB.</p>
         <p class="status mono" id="cloneStatus" role="status" aria-live="polite"></p>
       </div>
       <div class="callout">
@@ -467,7 +468,7 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
   </section>
 </main>
 
-<footer>Device voices run on your phone or computer and nothing leaves it. Puter voices, Pro keys and cloning send your text or recording to the service you choose.</footer>
+<footer>Device voices run on your phone or computer. Cloud narration sends your text to the provider you select. Re-voice uploads your recording to Puter; voice cloning uploads it to Fish Audio or ElevenLabs.</footer>
 
 <script>
 (function () {
