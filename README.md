@@ -56,6 +56,7 @@ The front end has no build step. With Node.js 22 or later, run the static checks
 
     node --check service-worker.js
     node --check relay/worker.js
+    node scripts/relay-smoke.mjs
     node scripts/validate.mjs
 
 To run the browser smoke suite locally, install Playwright and Chromium, start a static server in the repository root, then run the test:
