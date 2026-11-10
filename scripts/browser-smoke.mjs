@@ -108,6 +108,10 @@ try {
   console.log('PASS: Voice Lab decodes audio and exports processed WAV');
 
   await page.locator('#rvGo').click();
+  await page.getByText(/confirm that you own this recording/i).waitFor({ timeout: 5000 });
+  assert.equal(await page.locator('#rvOut audio').count(), 0, 're-voice is blocked without permission confirmation');
+  await page.locator('#rvConsent').check();
+  await page.locator('#rvGo').click();
   await page.getByText('Done.', { exact: true }).waitFor({ timeout: 10000 });
   assert.equal(await page.locator('#rvOut audio').count(), 1, 're-voice result player is rendered');
   console.log('PASS: mocked re-voice flow returns a playable result');
