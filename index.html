@@ -1092,7 +1092,7 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
     if (!blobs || !blobs.length) return;
     var btn = document.createElement('button');
     btn.type = 'button';
-    btn.className = 'primary';
+    btn.className = 'btn primary';
     btn.textContent = blobs.length > 1 ? 'Build complete narration (WAV)' : 'Download complete narration (WAV)';
     btn.style.marginTop = '12px';
     btn.addEventListener('click', async function () {
