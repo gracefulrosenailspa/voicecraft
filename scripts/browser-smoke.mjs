@@ -55,7 +55,16 @@ try {
   await page.locator('#cModel').selectOption('gpt-4o-mini-tts');
   const expressiveVoices = await page.locator('#cVoice option').evaluateAll(options => options.map(option => option.value));
   assert.ok(['ballad', 'verse', 'marin', 'cedar'].every(voice => expressiveVoices.includes(voice)), 'gpt-4o-mini-tts exposes its supported expressive voices');
-  console.log('PASS: OpenAI voice choices follow the selected model');  await page.locator('#script').fill('VoiceCraft browser smoke test.');
+  console.log('PASS: OpenAI voice choices follow the selected model');
+  assert.equal(await page.locator('#previewDevice').count(), 1, 'device voice audition control is available');
+  assert.equal(await page.locator('#previewCloud').count(), 1, 'cloud voice audition control is available');
+  assert.equal(await page.locator('#previewKeys').count(), 1, 'pro voice audition control is available');
+  await page.locator('#previewCloud').click();
+  await page.locator('#previewCloudAudio').waitFor({ state: 'visible', timeout: 10000 });
+  const previewCall = await page.evaluate(() => window.__ttsCalls.at(-1));
+  assert.match(previewCall.text, /world does not change in a moment/i, 'voice audition uses the short preview script');
+  assert.equal(previewCall.options.voice, 'onyx', 'voice audition uses the currently selected cloud voice');
+  console.log('PASS: voice audition controls render and cloud preview uses the selected voice');  await page.locator('#script').fill('VoiceCraft browser smoke test.');
   await page.waitForFunction(() => document.querySelector('#count')?.textContent.includes('30'), null, { timeout: 5000 });
   await page.setViewportSize({ width: 390, height: 844 });
   const mobileLayout = await page.evaluate(() => ({
