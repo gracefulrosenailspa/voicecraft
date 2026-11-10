@@ -1084,6 +1084,72 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
     }
     return { text: text, options: o };
   }
+  var combinedUrl = null;
+  function revokeCombinedUrl() {
+    if (combinedUrl) { URL.revokeObjectURL(combinedUrl); combinedUrl = null; }
+  }
+  function addCombinedWavButton(blobs) {
+    if (!blobs || !blobs.length) return;
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'primary';
+    btn.textContent = blobs.length > 1 ? 'Build complete narration (WAV)' : 'Download complete narration (WAV)';
+    btn.style.marginTop = '12px';
+    btn.addEventListener('click', async function () {
+      btn.disabled = true;
+      btn.textContent = 'Preparing complete audio…';
+      setStatus('Combining audio sections. Keep this tab open…');
+      try {
+        var ctx = audioCtx(), decoded = [], totalFrames = 0, channels = 1, rate = ctx.sampleRate;
+        for (var i = 0; i < blobs.length; i++) {
+          var ab = await blobs[i].arrayBuffer();
+          var audio = await ctx.decodeAudioData(ab.slice(0));
+          decoded.push(audio);
+          totalFrames += audio.length;
+          channels = Math.max(channels, Math.min(2, audio.numberOfChannels));
+        }
+        var gapFrames = Math.round(rate * 0.18);
+        totalFrames += gapFrames * Math.max(0, decoded.length - 1);
+        var dataBytes = totalFrames * channels * 2;
+        if (dataBytes > 180 * 1024 * 1024) throw new Error('The combined WAV would be too large for reliable browser export. Download the sections individually.');
+        var wav = new ArrayBuffer(44 + dataBytes), view = new DataView(wav);
+        function writeText(offset, value) { for (var j = 0; j < value.length; j++) view.setUint8(offset + j, value.charCodeAt(j)); }
+        writeText(0, 'RIFF'); view.setUint32(4, 36 + dataBytes, true); writeText(8, 'WAVE');
+        writeText(12, 'fmt '); view.setUint32(16, 16, true); view.setUint16(20, 1, true);
+        view.setUint16(22, channels, true); view.setUint32(24, rate, true);
+        view.setUint32(28, rate * channels * 2, true); view.setUint16(32, channels * 2, true);
+        view.setUint16(34, 16, true); writeText(36, 'data'); view.setUint32(40, dataBytes, true);
+        var offset = 44;
+        decoded.forEach(function (audio, index) {
+          for (var frame = 0; frame < audio.length; frame++) {
+            for (var ch = 0; ch < channels; ch++) {
+              var sourceChannel = Math.min(ch, audio.numberOfChannels - 1);
+              var sample = Math.max(-1, Math.min(1, audio.getChannelData(sourceChannel)[frame]));
+              view.setInt16(offset, sample < 0 ? sample * 32768 : sample * 32767, true);
+              offset += 2;
+            }
+          }
+          if (index < decoded.length - 1) {
+            for (var silence = 0; silence < gapFrames * channels; silence++) { view.setInt16(offset, 0, true); offset += 2; }
+          }
+        });
+        revokeCombinedUrl();
+        combinedUrl = URL.createObjectURL(new Blob([wav], { type: 'audio/wav' }));
+        var link = document.createElement('a');
+        link.href = combinedUrl; link.download = 'voicecraft-complete-narration.wav';
+        link.textContent = 'Download complete narration (WAV)';
+        link.style.display = 'inline-block'; link.style.marginTop = '10px';
+        btn.replaceWith(link);
+        setStatus('Complete narration is ready to download.');
+      } catch (err) {
+        btn.disabled = false;
+        btn.textContent = 'Try building complete narration again';
+        setStatus('Could not combine the sections: ' + (err && err.message ? err.message : String(err)));
+      }
+    });
+    $('cloudOut').appendChild(btn);
+  }
+
   function addCard(audio, i, n) {
     var card = document.createElement('div'); card.className = 'audio-card';
     var t = document.createElement('strong'); t.textContent = 'Section ' + (i + 1) + ' of ' + n; card.appendChild(t);
@@ -1117,7 +1183,8 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
     var text = $('script').value.trim();
     if (!text) { setStatus('Write or paste a script first.'); return; }
     if (cloudBusy) return;
-    var chunks = splitChunks(text), done = 0;
+    var chunks = splitChunks(text), done = 0, completeBlobs = [];
+    revokeCombinedUrl();
     cloudBusy = true; cloudCancel = false;
     $('cloudOut').textContent = ''; $('cloudOut').hidden = false; $('bar').style.width = '0%';
     ui();
@@ -1129,9 +1196,13 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
         var audio = await window.puter.ai.txt2speech(r.text, r.options);
         if (!audio || !audio.src) throw new Error('The provider returned no playable audio.');
         addCard(audio, i, chunks.length);
+        try { var audioResponse = await fetch(audio.src); if (!audioResponse.ok) throw new Error('Audio download unavailable'); completeBlobs.push(await audioResponse.blob()); }
+        catch (downloadErr) { completeBlobs = []; }
         done++;
         $('bar').style.width = Math.round((done / chunks.length) * 100) + '%';
       }
+      if (done && completeBlobs.length === done) addCombinedWavButton(completeBlobs);
+      if (done && completeBlobs.length === done) addCombinedWavButton(completeBlobs);
       setStatus(cloudCancel ? 'Stopped. ' + done + ' sections ready.' : 'Done. Play or download your sections below.');
     } catch (err) {
       setStatus('Generation stopped: ' + (err && err.message ? err.message : String(err)));
@@ -1571,7 +1642,8 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
     var voice = kCurrentVoice();
     if (svc === 'eleven' && !voice) { setStatus('Choose a voice first. Press Load voices, or paste a voice ID.'); return; }
     if (cloudBusy) return;
-    var chunks = splitChunks(text), done = 0;
+    var chunks = splitChunks(text), done = 0, completeBlobs = [];
+    revokeCombinedUrl();
     kUrls.forEach(function (u) { URL.revokeObjectURL(u); });
     kUrls = [];
     cloudBusy = true; cloudCancel = false; kAbort = new AbortController();
@@ -1610,6 +1682,7 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
         if (!blob.size) throw new Error('The service returned empty audio.');
         var u = URL.createObjectURL(blob);
         kUrls.push(u);
+        completeBlobs.push(blob);
         addCard({ src: u }, i, chunks.length);
         done++;
         $('bar').style.width = Math.round((done / chunks.length) * 100) + '%';
