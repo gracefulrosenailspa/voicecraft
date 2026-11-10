@@ -28,10 +28,10 @@ Cloudflare's Worker Rate Limiting API is approximate and enforced separately in 
 ## What the relay enforces
 
 - Only the configured VoiceCraft GitHub Pages origin is allowed by the browser CORS policy.
-- Only `GET /model`, `GET /model/*`, and `POST /v1/tts` are accepted.
+- Only `GET /model`, `GET /model/*`, `POST /model` for voice cloning, and `POST /v1/tts` are accepted.
 - A Fish Audio bearer token is required.
 - The bearer token is SHA-256 hashed before being used as the rate-limit key. The raw token is not logged or stored by this Worker.
-- Requests are limited to 1 MiB, including streamed bodies without a trustworthy Content-Length header.
+- Text-to-speech request bodies are limited to 1 MiB. Fish Audio voice-cloning uploads to `POST /model` are limited to 25 MiB. Both limits are enforced while streaming, even when Content-Length is missing or inaccurate.
 - Requests are not cached.
 - Missing or unavailable rate limiting fails closed with HTTP 503.
 
@@ -43,7 +43,9 @@ From VoiceCraft, enter your own Fish Audio key and test:
 1. Load the Fish Audio voice/model list.
 2. Generate a short narration.
 3. Generate a longer narration that is split into multiple sections.
-4. Confirm that invalid credentials return a useful provider error.
-5. Confirm that the relay returns HTTP 503 if the rate-limit binding is unavailable, and HTTP 429 after the configured limit is exceeded.
+4. Upload an eligible voice sample and create a private Fish Audio clone through the relay.
+5. Confirm that invalid credentials return a useful provider error.
+6. Confirm that oversized TTS and clone uploads are rejected with HTTP 413.
+7. Confirm that the relay returns HTTP 503 if the rate-limit binding is unavailable, and HTTP 429 after the configured limit is exceeded.
 
 Do not publish the relay address as production-ready until these checks pass. Monitor Worker logs and traces for HTTP 429 and 5xx responses.
