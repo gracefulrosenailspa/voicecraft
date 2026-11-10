@@ -57,6 +57,17 @@ try {
   assert.ok(['ballad', 'verse', 'marin', 'cedar'].every(voice => expressiveVoices.includes(voice)), 'gpt-4o-mini-tts exposes its supported expressive voices');
   console.log('PASS: OpenAI voice choices follow the selected model');  await page.locator('#script').fill('VoiceCraft browser smoke test.');
   await page.waitForFunction(() => document.querySelector('#count')?.textContent.includes('30'), null, { timeout: 5000 });
+  await page.setViewportSize({ width: 390, height: 844 });
+  const mobileLayout = await page.evaluate(() => ({
+    viewport: window.innerWidth,
+    document: document.documentElement.scrollWidth,
+    body: document.body.scrollWidth
+  }));
+  assert.ok(mobileLayout.document <= mobileLayout.viewport && mobileLayout.body <= mobileLayout.viewport,
+    'the app has no horizontal overflow at a 390px mobile viewport: ' + JSON.stringify(mobileLayout));
+  assert.equal(await page.locator('#play').isVisible(), true, 'primary narration control remains visible on mobile');
+  await page.setViewportSize({ width: 1280, height: 720 });
+  console.log('PASS: responsive layout fits a 390px mobile viewport');
   console.log('PASS: app loads and narration editor responds');
 
   await page.evaluate(() => { const input = document.querySelector('#intensity'); input.value = '100'; input.dispatchEvent(new Event('input', { bubbles: true })); });
