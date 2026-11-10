@@ -142,8 +142,8 @@ try {
 
   await page.evaluate(() => { const input = document.querySelector('#intensity'); input.value = '100'; input.dispatchEvent(new Event('input', { bubbles: true })); });
   await page.locator('#play').click();
-  await page.getByRole('button', { name: /complete narration/i }).waitFor({ state: 'visible', timeout: 10000 });
-  await page.getByRole('button', { name: /complete narration/i }).click();
+  await page.getByRole('button', { name: /build complete narration/i }).waitFor({ state: 'visible', timeout: 10000 });
+  await page.getByRole('button', { name: /build complete narration/i }).click();
   await page.getByRole('link', { name: /download complete narration/i }).waitFor({ state: 'visible', timeout: 10000 });
   const combinedWav = await page.getByRole('link', { name: /download complete narration/i }).evaluate(async link => {
     const bytes = await (await fetch(link.href)).arrayBuffer();
