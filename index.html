@@ -9,6 +9,7 @@
 <meta name="apple-mobile-web-app-title" content="VoiceCraft">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
 <title>VoiceCraft Studio</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -398,7 +399,7 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
     <div class="lab">
       <div class="card" style="display:grid;gap:14px">
         <h2>Make a recording deeper</h2>
-        <p class="note">Load a voice recording and reshape it: lower the pitch, add chest warmth, and place it in a room. Everything runs on this device. Your file is not uploaded anywhere.</p>
+        <p class="note">Load a voice recording and reshape it: lower the pitch, add chest warmth, and place it in a room. Preview and WAV processing run on this device. Re-voice and voice cloning upload your recording to the provider you choose.</p>
         <label class="drop" id="drop" for="file">
           <strong id="dropTitle">Choose a recording or drop it here</strong>
           <span class="note" id="dropSub">MP3, WAV, M4A or OGG</span>
@@ -424,6 +425,7 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
         <div class="transport">
           <button class="btn primary" id="labPlay" type="button" disabled>Play with effects</button>
           <button class="btn" id="labStop" type="button" disabled>Stop</button>
+          <button class="btn" id="labExport" type="button" disabled>Export processed WAV</button>
           <span class="meta mono" id="labInfo"></span>
         </div>
         <p class="status mono" id="labStatus" role="status" aria-live="polite">Load a recording to begin.</p>
@@ -435,7 +437,8 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
       </div>
       <div class="card" style="display:grid;gap:14px" id="revoiceCard">
         <h2>Re-voice with a cloud voice</h2>
-        <p class="note" id="revoiceNote">Converts the recording you loaded above into a different voice and keeps your timing and delivery. The result is a preset voice speaking your performance, not a copy of your own voice.</p>
+        <p class="note" id="revoiceNote">Converts the recording you loaded above into a different voice and keeps your timing and delivery. Your audio is sent to Puter for processing. The result is a preset voice speaking your performance, not a copy of your own voice.</p>
+        <label class="check" for="rvConsent"><input type="checkbox" id="rvConsent"> I own this recording or have permission to process the speaker's voice.</label>
         <div class="field">
           <label for="rvVoice">Target voice <output id="rvCount"></output></label>
           <select id="rvVoice" disabled></select>
@@ -456,6 +459,7 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
         <div class="field"><label for="cloneName">Voice name</label><input type="text" id="cloneName" value="My voice"></div>
         <label class="check" for="cloneConsent"><input type="checkbox" id="cloneConsent"> This is my own voice, or the speaker has given me permission.</label>
         <div class="transport"><button class="btn primary" id="cloneGo" type="button" disabled>Create cloned voice</button></div>
+        <p class="note">Creating a clone uploads this recording to the selected provider. Fish Audio relay uploads are limited to 25 MiB.</p>
         <p class="status mono" id="cloneStatus" role="status" aria-live="polite"></p>
       </div>
       <div class="callout">
@@ -465,7 +469,7 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
   </section>
 </main>
 
-<footer>Device voices run on your phone or computer and nothing leaves it. Puter voices, Pro keys and cloning send your text or recording to the service you choose.</footer>
+<footer>Device voices run on your phone or computer. Cloud narration sends your text to the provider you select. Re-voice uploads your recording to Puter; voice cloning uploads it to Fish Audio or ElevenLabs.</footer>
 
 <script>
 (function () {
@@ -515,7 +519,7 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
     elevenlabs: {
       label: 'ElevenLabs',
       voices: ['Rachel', 'Bella', 'Antoni', 'Josh', 'Arnold', 'Adam', 'Elli', 'Sam', 'Domi'],
-      models: ['eleven_multilingual_v2', 'eleven_v3', 'eleven_flash_v2_5'],
+      models: ['eleven_v4', 'eleven_v4_turbo', 'eleven_v3', 'eleven_v3_conversational', 'eleven_multilingual_v2', 'eleven_flash_v2_5', 'eleven_flash_v2'],
       star: ['Adam', 'Josh', 'Arnold', 'Antoni']
     },
     'aws-polly': {
@@ -868,8 +872,8 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
   function stop() {
     if (S.engine !== 'device') {
       cloudCancel = true;
-      if (kAbort) kAbort.abort();
-      setStatus('Stopping.');
+      if (kAbort) { kAbort.abort(); setStatus('Cancelling the current provider request…'); }
+      else setStatus('Will stop after the current cloud section finishes.');
       return;
     }
     sid++;
@@ -1002,8 +1006,12 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
   var cGenerated = 0;
   function moodInstruction() {
     var t = MOODS[S.mood].text;
-    var p = PRESETS[S.preset];
+    var p = PRESETS[S.preset], intensity = clamp(S.intensity, 0, 100);
     if (p && p.deep) t += ' Use a deep, resonant, low-pitched male narrator register.';
+    if (intensity < 25) t += ' Keep the delivery restrained, subtle and intimate.';
+    else if (intensity < 50) t += ' Use gentle, measured emotional expression.';
+    else if (intensity < 75) t += ' Use clear, expressive emphasis while staying natural.';
+    else t += ' Deliver with strong, vivid emotional expression and confident emphasis without shouting.';
     if (S.direction.trim()) t += ' ' + S.direction.trim();
     return t;
   }
@@ -1018,7 +1026,13 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
     pSel.value = S.cProvider;
     var c = CLOUD[S.cProvider], vSel = $('cVoice');
     vSel.textContent = '';
-    var ordered = c.star.concat(c.voices.filter(function (v) { return c.star.indexOf(v) < 0; }));
+    // OpenAI's extra expressive voices are only accepted by gpt-4o-mini-tts.
+    var availableVoices = c.voices.filter(function (v) {
+      return S.cProvider !== 'openai' || S.cModel === 'gpt-4o-mini-tts' ||
+        ['ballad', 'verse', 'marin', 'cedar'].indexOf(v) < 0;
+    });
+    var ordered = c.star.filter(function (v) { return availableVoices.indexOf(v) >= 0; })
+      .concat(availableVoices.filter(function (v) { return c.star.indexOf(v) < 0; }));
     ordered.forEach(function (v) {
       var o = document.createElement('option'); o.value = v;
       o.textContent = (c.star.indexOf(v) >= 0 ? '★ ' : '') + v; vSel.appendChild(o);
@@ -1040,7 +1054,7 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
     fillCloud(); persist();
   });
   $('cVoice').addEventListener('change', function () { S.cVoice = $('cVoice').value; persist(); });
-  $('cModel').addEventListener('change', function () { S.cModel = $('cModel').value; persist(); });
+  $('cModel').addEventListener('change', function () { S.cModel = $('cModel').value; fillCloud(); persist(); });
   $('direction').addEventListener('input', function () { S.direction = $('direction').value; persist(); });
 
   function splitChunks(text) {
@@ -1075,7 +1089,14 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
     var o = { provider: S.cProvider, voice: S.cVoice };
     if (S.cProvider === 'gemini') { o.model = S.cModel; o.instructions = moodInstruction(); }
     if (S.cProvider === 'openai') { o.model = S.cModel; if (S.cModel === 'gpt-4o-mini-tts') o.instructions = moodInstruction(); }
-    if (S.cProvider === 'elevenlabs' || S.cProvider === 'speechify') o.model = S.cModel;
+    if (S.cProvider === 'elevenlabs') {
+      o.model = S.cModel;
+      var intensity = S.intensity / 100;
+      var stability = clamp(0.8 - 0.6 * intensity, 0.2, 0.8);
+      if (/_v3/.test(S.cModel)) stability = stability < 0.25 ? 0 : (stability < 0.75 ? 0.5 : 1);
+      o.voice_settings = { stability: stability, similarity_boost: 0.75, speed: 1 };
+    }
+    if (S.cProvider === 'speechify') o.model = S.cModel;
     if (S.cProvider === 'aws-polly') { o.engine = S.cModel; o.language = 'en-US'; }
     if (S.cProvider === 'xai') {
       if (S.mood === 'dramatic') text = '[pause] ' + text;
@@ -1084,6 +1105,75 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
     }
     return { text: text, options: o };
   }
+  var combinedUrl = null;
+  function revokeCombinedUrl() {
+    if (combinedUrl) { URL.revokeObjectURL(combinedUrl); combinedUrl = null; }
+  }
+  function addCombinedWavButton(blobs) {
+    if (!blobs || !blobs.length) return;
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn primary';
+    btn.textContent = blobs.length > 1 ? 'Build complete narration (WAV)' : 'Download complete narration (WAV)';
+    btn.style.marginTop = '12px';
+    btn.addEventListener('click', async function () {
+      btn.disabled = true;
+      btn.textContent = 'Preparing complete audio…';
+      setStatus('Combining audio sections. Keep this tab open…');
+      try {
+        var ctx = audioCtx(), decoded = [], totalFrames = 0, channels = 1, rate = ctx.sampleRate;
+        var gapFrames = Math.round(rate * 0.18), maxWavBytes = 32 * 1024 * 1024;
+        for (var i = 0; i < blobs.length; i++) {
+          var ab = await blobs[i].arrayBuffer();
+          var audio = await ctx.decodeAudioData(ab.slice(0));
+          decoded.push(audio);
+          totalFrames += audio.length;
+          channels = Math.max(channels, Math.min(2, audio.numberOfChannels));
+          var projectedFrames = totalFrames + gapFrames * Math.max(0, decoded.length - 1);
+          if (projectedFrames * channels * 2 > maxWavBytes) {
+            throw new Error('The combined WAV would be too large for reliable browser export. Download the sections individually.');
+          }
+        }
+        totalFrames += gapFrames * Math.max(0, decoded.length - 1);
+        var dataBytes = totalFrames * channels * 2;
+        var wav = new ArrayBuffer(44 + dataBytes), view = new DataView(wav);
+        function writeText(offset, value) { for (var j = 0; j < value.length; j++) view.setUint8(offset + j, value.charCodeAt(j)); }
+        writeText(0, 'RIFF'); view.setUint32(4, 36 + dataBytes, true); writeText(8, 'WAVE');
+        writeText(12, 'fmt '); view.setUint32(16, 16, true); view.setUint16(20, 1, true);
+        view.setUint16(22, channels, true); view.setUint32(24, rate, true);
+        view.setUint32(28, rate * channels * 2, true); view.setUint16(32, channels * 2, true);
+        view.setUint16(34, 16, true); writeText(36, 'data'); view.setUint32(40, dataBytes, true);
+        var offset = 44;
+        decoded.forEach(function (audio, index) {
+          for (var frame = 0; frame < audio.length; frame++) {
+            for (var ch = 0; ch < channels; ch++) {
+              var sourceChannel = Math.min(ch, audio.numberOfChannels - 1);
+              var sample = Math.max(-1, Math.min(1, audio.getChannelData(sourceChannel)[frame]));
+              view.setInt16(offset, sample < 0 ? sample * 32768 : sample * 32767, true);
+              offset += 2;
+            }
+          }
+          if (index < decoded.length - 1) {
+            for (var silence = 0; silence < gapFrames * channels; silence++) { view.setInt16(offset, 0, true); offset += 2; }
+          }
+        });
+        revokeCombinedUrl();
+        combinedUrl = URL.createObjectURL(new Blob([wav], { type: 'audio/wav' }));
+        var link = document.createElement('a');
+        link.href = combinedUrl; link.download = 'voicecraft-complete-narration.wav';
+        link.textContent = 'Download complete narration (WAV)';
+        link.style.display = 'inline-block'; link.style.marginTop = '10px';
+        btn.replaceWith(link);
+        setStatus('Complete narration is ready to download.');
+      } catch (err) {
+        btn.disabled = false;
+        btn.textContent = 'Try building complete narration again';
+        setStatus('Could not combine the sections: ' + (err && err.message ? err.message : String(err)));
+      }
+    });
+    $('cloudOut').appendChild(btn);
+  }
+
   function addCard(audio, i, n) {
     var card = document.createElement('div'); card.className = 'audio-card';
     var t = document.createElement('strong'); t.textContent = 'Section ' + (i + 1) + ' of ' + n; card.appendChild(t);
@@ -1117,7 +1207,8 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
     var text = $('script').value.trim();
     if (!text) { setStatus('Write or paste a script first.'); return; }
     if (cloudBusy) return;
-    var chunks = splitChunks(text), done = 0;
+    var chunks = splitChunks(text), done = 0, completeBlobs = [];
+    revokeCombinedUrl();
     cloudBusy = true; cloudCancel = false;
     $('cloudOut').textContent = ''; $('cloudOut').hidden = false; $('bar').style.width = '0%';
     ui();
@@ -1129,10 +1220,14 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
         var audio = await window.puter.ai.txt2speech(r.text, r.options);
         if (!audio || !audio.src) throw new Error('The provider returned no playable audio.');
         addCard(audio, i, chunks.length);
+        if (cloudCancel) { done++; break; }
+        try { var audioResponse = await fetch(audio.src); if (!audioResponse.ok) throw new Error('Audio download unavailable'); completeBlobs.push(await audioResponse.blob()); }
+        catch (downloadErr) { completeBlobs = []; }
         done++;
         $('bar').style.width = Math.round((done / chunks.length) * 100) + '%';
       }
-      setStatus(cloudCancel ? 'Stopped. ' + done + ' sections ready.' : 'Done. Play or download your sections below.');
+      if (done && completeBlobs.length === done) addCombinedWavButton(completeBlobs);
+      setStatus(cloudCancel ? 'Stopped. ' + done + ' sections ready.' : (done && completeBlobs.length !== done ? 'Done. Individual sections are ready. Complete WAV export was unavailable from the provider audio links.' : 'Done. Play or download your sections below.'));
     } catch (err) {
       setStatus('Generation stopped: ' + (err && err.message ? err.message : String(err)));
     } finally {
@@ -1196,12 +1291,26 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
     if (mq.addEventListener) mq.addEventListener('change', function () { setTimeout(drawWave, 50); });
   }
 
+  var labLoadSeq = 0;
   async function loadFile(f) {
+    var loadId = ++labLoadSeq;
     labStop();
+    var priorDownload = $('labDownload');
+    if (priorDownload) priorDownload.remove();
+    if (labExportUrl) { URL.revokeObjectURL(labExportUrl); labExportUrl = null; }
+    labBuf = null;
+    labFile = null;
+    $('rvConsent').checked = false;
+    $('cloneConsent').checked = false;
+    $('labPlay').disabled = true;
+    $('labExport').disabled = true;
+    $('rvGo').disabled = true;
+    $('cloneGo').disabled = true;
     labStatus('Reading ' + f.name + '…');
     try {
       var ab = await f.arrayBuffer();
       var buf = await audioCtx().decodeAudioData(ab);
+      if (loadId !== labLoadSeq) return;
       labBuf = buf;
       labFile = f;
       $('rvGo').disabled = !STANDALONE;
@@ -1209,12 +1318,15 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
       $('dropTitle').textContent = f.name;
       $('dropSub').textContent = fmt(buf.duration) + ' · tap to choose another';
       $('labPlay').disabled = false;
+      $('labExport').disabled = false;
       labLabels(); drawWave();
       labStatus('Loaded. Press Play and move the sliders while it runs.');
     } catch (err) {
+      if (loadId !== labLoadSeq) return;
       labBuf = null;
       labFile = f;
       $('labPlay').disabled = true;
+      $('labExport').disabled = true;
       $('rvGo').disabled = !STANDALONE;
       $('cloneGo').disabled = !STANDALONE;
       drawWave();
@@ -1237,7 +1349,12 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
     var len = Math.floor(c.sampleRate * secs), b = c.createBuffer(2, len, c.sampleRate);
     for (var ch = 0; ch < 2; ch++) {
       var d = b.getChannelData(ch);
-      for (var i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, decay);
+      var state = (2463534242 + ch * 1013904223) >>> 0;
+      for (var i = 0; i < len; i++) {
+        state ^= state << 13; state ^= state >>> 17; state ^= state << 5;
+        var noise = (state >>> 0) / 4294967295 * 2 - 1;
+        d[i] = noise * Math.pow(1 - i / len, decay);
+      }
     }
     return b;
   }
@@ -1258,10 +1375,12 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
   }
   async function labPlay() {
     if (!labBuf) return;
+    var playLoad = labLoadSeq, playBuffer = labBuf;
     labStop();
     var c = audioCtx();
     try { await c.resume(); } catch (e) { /* resume refused */ }
-    var src = c.createBufferSource(); src.buffer = labBuf;
+    if (playLoad !== labLoadSeq || labBuf !== playBuffer) return;
+    var src = c.createBufferSource(); src.buffer = playBuffer;
     var low = c.createBiquadFilter(); low.type = 'lowshelf'; low.frequency.value = 180;
     var comp = c.createDynamicsCompressor(); comp.threshold.value = -24; comp.ratio.value = 3;
     var dry = c.createGain(), wet = c.createGain(), master = c.createGain(); master.gain.value = 0.9;
@@ -1281,6 +1400,77 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
     labStatus('Playing. Adjust the sliders while it runs.');
     labTick();
   }
+  var labExportUrl = null;
+  function exportWavBuffer(buffer, filename) {
+    var channels = Math.min(2, buffer.numberOfChannels), frames = buffer.length;
+    var bytes = frames * channels * 2;
+    if (bytes > 32 * 1024 * 1024) throw new Error('This recording is too large to export reliably in this browser. Try a shorter recording.');
+    var out = new ArrayBuffer(44 + bytes), view = new DataView(out);
+    function tag(pos, value) { for (var i = 0; i < value.length; i++) view.setUint8(pos + i, value.charCodeAt(i)); }
+    tag(0, 'RIFF'); view.setUint32(4, 36 + bytes, true); tag(8, 'WAVE');
+    tag(12, 'fmt '); view.setUint32(16, 16, true); view.setUint16(20, 1, true);
+    view.setUint16(22, channels, true); view.setUint32(24, buffer.sampleRate, true);
+    view.setUint32(28, buffer.sampleRate * channels * 2, true); view.setUint16(32, channels * 2, true);
+    view.setUint16(34, 16, true); tag(36, 'data'); view.setUint32(40, bytes, true);
+    var offset = 44, channelData = [];
+    for (var ch = 0; ch < channels; ch++) channelData.push(buffer.getChannelData(ch));
+    for (var frame = 0; frame < frames; frame++) {
+      for (var c = 0; c < channels; c++) {
+        var sample = Math.max(-1, Math.min(1, channelData[c][frame]));
+        view.setInt16(offset, sample < 0 ? sample * 32768 : sample * 32767, true);
+        offset += 2;
+      }
+    }
+    if (labExportUrl) URL.revokeObjectURL(labExportUrl);
+    labExportUrl = URL.createObjectURL(new Blob([out], { type: 'audio/wav' }));
+    var link = document.createElement('a');
+    link.href = labExportUrl; link.download = filename;
+    link.textContent = 'Download processed recording (WAV)';
+    link.className = 'btn primary'; link.style.marginTop = '10px';
+    var old = $('labDownload'); if (old) old.remove();
+    link.id = 'labDownload';
+    $('labStatus').insertAdjacentElement('afterend', link);
+  }
+  async function exportLabWav() {
+    if (!labBuf) return;
+    var sourceBuffer = labBuf, sourceLoad = labLoadSeq;
+    var button = $('labExport'), v = labValues();
+    button.disabled = true; button.textContent = 'Rendering effects…';
+    labStatus('Rendering the processed recording. Keep this tab open…');
+    try {
+      var Offline = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+      if (!Offline) throw new Error('This browser does not support offline audio rendering.');
+      var rate = Math.pow(2, v.depth / 12);
+      var renderRate = labBuf.sampleRate;
+      var tail = 1.8;
+      var frames = Math.ceil((labBuf.duration / rate + tail) * renderRate);
+      var bytes = frames * 2 * 2;
+      if (bytes > 32 * 1024 * 1024) throw new Error('The processed WAV would be too large for reliable browser export. Try a shorter recording.');
+      var offline = new Offline(2, frames, renderRate);
+      var src = offline.createBufferSource(); src.buffer = labBuf;
+      var low = offline.createBiquadFilter(); low.type = 'lowshelf'; low.frequency.value = 180; low.gain.value = v.warmth;
+      var comp = offline.createDynamicsCompressor(); comp.threshold.value = -24; comp.ratio.value = 3;
+      var dry = offline.createGain(), wet = offline.createGain(), master = offline.createGain();
+      master.gain.value = 0.9;
+      var conv = offline.createConvolver(); conv.buffer = impulse(offline, tail, 3);
+      src.playbackRate.value = rate;
+      wet.gain.value = v.room / 100; dry.gain.value = 1 - (v.room / 100) * 0.5;
+      src.connect(low); low.connect(comp);
+      comp.connect(dry); dry.connect(master);
+      comp.connect(conv); conv.connect(wet); wet.connect(master);
+      master.connect(offline.destination);
+      src.start(0);
+      var rendered = await offline.startRendering();
+      if (sourceLoad !== labLoadSeq || labBuf !== sourceBuffer) return;
+      exportWavBuffer(rendered, 'voicecraft-processed-recording.wav');
+      labStatus('Processed WAV is ready. Download it below.');
+    } catch (err) {
+      labStatus('Export failed: ' + (err && err.message ? err.message : String(err)));
+    } finally {
+      button.disabled = !labBuf;
+      button.textContent = 'Export processed WAV';
+    }
+  }
   function labStop() {
     if (labSrc) {
       var s = labSrc; labSrc = null; labNodes = null;
@@ -1293,6 +1483,7 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
   }
   $('labPlay').addEventListener('click', labPlay);
   $('labStop').addEventListener('click', function () { labStop(); labStatus('Stopped.'); });
+  $('labExport').addEventListener('click', exportLabWav);
   ['depth', 'warmth', 'room'].forEach(function (id) {
     $(id).addEventListener('input', function () {
       document.querySelectorAll('#labPresets .chip').forEach(function (b) { b.setAttribute('aria-pressed', 'false'); });
@@ -1350,18 +1541,24 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
   }
   async function rvConvert() {
     if (!STANDALONE) { rvStatus('Re-voice needs the standalone file.'); return; }
-    rvStatus('Loading Puter…');
-    try { await ensurePuter(); } catch (e) { /* handled below */ }
-    if (!window.puter || !window.puter.ai || !window.puter.ai.speech2speech) {
-      rvStatus('Puter did not load. Check your connection and refresh the page.');
-      return;
-    }
-    if (!labFile) { rvStatus('Load a recording above first.'); return; }
+    var sourceFile = labFile, sourceLoad = labLoadSeq;
+    if (!sourceFile) { rvStatus('Load a recording above first.'); return; }
+    if (!$('rvConsent').checked) { rvStatus('Confirm that you own this recording or have permission to process the speaker.'); return; }
     $('rvGo').disabled = true;
     $('rvOut').textContent = '';
-    rvStatus('Converting. Puter may ask you to sign in.');
     try {
-      var audio = await window.puter.ai.speech2speech({ audio: labFile, voice: $('rvVoice').value });
+      rvStatus('Loading Puter…');
+      try { await ensurePuter(); } catch (e) { /* reported below */ }
+      if (sourceFile !== labFile || sourceLoad !== labLoadSeq) {
+        rvStatus('The selected recording changed. Please try again.');
+        return;
+      }
+      if (!window.puter || !window.puter.ai || !window.puter.ai.speech2speech) {
+        throw new Error('Puter did not load. Check your connection and refresh the page.');
+      }
+      rvStatus('Converting. Puter may ask you to sign in.');
+      var audio = await window.puter.ai.speech2speech({ audio: sourceFile, voice: $('rvVoice').value });
+      if (sourceFile !== labFile || sourceLoad !== labLoadSeq) return;
       if (!audio || !audio.src) throw new Error('No audio was returned.');
       var card = document.createElement('div'); card.className = 'audio-card';
       var t = document.createElement('strong'); t.textContent = 'Converted recording'; card.appendChild(t);
@@ -1371,10 +1568,12 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
       $('rvOut').appendChild(card);
       rvStatus('Done.');
     } catch (err) {
-      var msg = err && err.message ? err.message : (typeof err === 'string' ? err : 'unknown error');
-      rvStatus('Conversion failed: ' + msg);
+      if (sourceFile === labFile && sourceLoad === labLoadSeq) {
+        var msg = err && err.message ? err.message : (typeof err === 'string' ? err : 'unknown error');
+        rvStatus('Conversion failed: ' + msg);
+      }
     } finally {
-      $('rvGo').disabled = false;
+      $('rvGo').disabled = !labFile;
     }
   }
   $('rvGo').addEventListener('click', rvConvert);
@@ -1571,7 +1770,8 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
     var voice = kCurrentVoice();
     if (svc === 'eleven' && !voice) { setStatus('Choose a voice first. Press Load voices, or paste a voice ID.'); return; }
     if (cloudBusy) return;
-    var chunks = splitChunks(text), done = 0;
+    var chunks = splitChunks(text), done = 0, completeBlobs = [];
+    revokeCombinedUrl();
     kUrls.forEach(function (u) { URL.revokeObjectURL(u); });
     kUrls = [];
     cloudBusy = true; cloudCancel = false; kAbort = new AbortController();
@@ -1610,10 +1810,12 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
         if (!blob.size) throw new Error('The service returned empty audio.');
         var u = URL.createObjectURL(blob);
         kUrls.push(u);
+        completeBlobs.push(blob);
         addCard({ src: u }, i, chunks.length);
         done++;
         $('bar').style.width = Math.round((done / chunks.length) * 100) + '%';
       }
+      if (done && completeBlobs.length === done) addCombinedWavButton(completeBlobs);
       setStatus(cloudCancel ? 'Stopped. ' + done + ' sections ready.' : 'Done. Play or download your sections below.');
     } catch (err) {
       if (err && err.name === 'AbortError') setStatus('Stopped. ' + done + ' sections ready.');
@@ -1702,6 +1904,16 @@ footer { max-width: 1180px; margin: 28px auto 0; font: 11.5px var(--font-mono); 
   showView(location.hash.slice(1));
   window.addEventListener('pagehide', function () { if (synth) synth.cancel(); });
 })();
+</script>
+
+<script>
+  // Register the app-shell service worker. Cloud TTS and provider APIs still require internet.
+  if ('serviceWorker' in navigator && window.isSecureContext) {
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('./service-worker.js', { scope: './' })
+        .catch(function (error) { console.warn('VoiceCraft offline shell registration failed:', error); });
+    });
+  }
 </script>
 
 </body>

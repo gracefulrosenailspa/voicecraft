@@ -1,0 +1,43 @@
+name: VoiceCraft validation
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+      - name: Check worker syntax
+        run: |
+          node --check service-worker.js
+          node --check relay/worker.js
+      - name: Test relay security and upload limits
+        run: node scripts/relay-smoke.mjs
+      - name: Validate app structure and inline scripts
+        run: node scripts/validate.mjs
+      - name: Install Playwright and Chromium
+        run: |
+          npm install --no-save --no-package-lock playwright
+          npx playwright install --with-deps chromium
+      - name: Run browser smoke tests
+        run: |
+          python3 -m http.server 4173 --bind 127.0.0.1 > /tmp/voicecraft-http.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid"' EXIT
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:4173/ > /dev/null; then break; fi
+            sleep 1
+          done
+          node scripts/browser-smoke.mjs
