@@ -52,17 +52,25 @@ async function rateLimitKey(secret) {
 }
 function resolveRoute(pathname, method) {
   if (pathname === '/model' || pathname.startsWith('/model/')) {
-    const upload = pathname === '/model' && method === 'POST';
-    const allowed = (method === 'GET' && (pathname === '/model' || pathname.startsWith('/model/'))) || upload;
-    return allowed ? { provider: 'fish', upstreamPath: pathname, upload } : null;
+    if (method === 'OPTIONS' || method === 'GET') return { provider: 'fish', upstreamPath: pathname, upload: false };
+    if (pathname === '/model' && method === 'POST') return { provider: 'fish', upstreamPath: pathname, upload: true };
+    return null;
   }
-  if (pathname === '/v1/tts' && method === 'POST') return { provider: 'fish', upstreamPath: pathname, upload: false };
+  if (pathname === '/v1/tts' && (method === 'OPTIONS' || method === 'POST')) {
+    return { provider: 'fish', upstreamPath: pathname, upload: false };
+  }
   if (!pathname.startsWith('/elevenlabs/')) return null;
   const upstreamPath = pathname.slice('/elevenlabs'.length);
-  const voiceList = method === 'GET' && (upstreamPath === '/v2/voices' || upstreamPath === '/v1/shared-voices');
-  const tts = method === 'POST' && /^\/v1\/text-to-speech\/[A-Za-z0-9_-]+$/.test(upstreamPath);
-  const clone = method === 'POST' && upstreamPath === '/v1/voices/add';
-  return voiceList || tts || clone ? { provider: 'eleven', upstreamPath, upload: clone } : null;
+  const voiceList = upstreamPath === '/v2/voices' || upstreamPath === '/v1/shared-voices';
+  const tts = /^\/v1\/text-to-speech\/[A-Za-z0-9_-]+$/.test(upstreamPath);
+  const clone = upstreamPath === '/v1/voices/add';
+  if (method === 'OPTIONS' && (voiceList || tts || clone)) {
+    return { provider: 'eleven', upstreamPath, upload: false };
+  }
+  if (method === 'GET' && voiceList) return { provider: 'eleven', upstreamPath, upload: false };
+  if (method === 'POST' && tts) return { provider: 'eleven', upstreamPath, upload: false };
+  if (method === 'POST' && clone) return { provider: 'eleven', upstreamPath, upload: true };
+  return null;
 }
 export default {
   async fetch(request, env) {
