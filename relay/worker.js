@@ -78,7 +78,7 @@ export default {
     if (!ALLOWED_ORIGINS.has(origin)) return response('Forbidden: website origin is not allowed', 403, corsHeaders('null'));
     const cors = corsHeaders(origin), url = new URL(request.url);
     const route = resolveRoute(url.pathname, request.method);
-    if (!route) return response('Not found or method not allowed', 404, cors);
+    if (!route) {\n      const knownPath = url.pathname === '/model' || url.pathname.startsWith('/model/') || url.pathname === '/v1/tts' || url.pathname.startsWith('/elevenlabs/');\n      return response(knownPath ? 'Method not allowed' : 'Not found', knownPath ? 405 : 404, cors);\n    }
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
 
     const credential = route.provider === 'fish' ? (request.headers.get('Authorization') || '') : (request.headers.get('xi-api-key') || '');
